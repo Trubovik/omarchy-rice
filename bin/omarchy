@@ -1,0 +1,12 @@
+#!/bin/bash
+# User-level wrapper for omarchy CLI routing agent subcommands to user wrappers
+
+if [[ "$1" == "default" && "$2" == "agent" ]]; then
+  shift 2
+  exec "$HOME/.local/bin/omarchy-default-agent" "$@"
+elif [[ "$1" == "agent" ]]; then
+  shift
+  exec "$HOME/.local/bin/omarchy-agent" "$@"
+fi
+
+exec /usr/bin/omarchy "$@"

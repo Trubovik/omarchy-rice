@@ -1,0 +1,454 @@
+#!/usr/bin/env python3
+"""
+Antigravity Multi-Account Manager & Auto-Rotation CLI (agy-account)
+Manages multiple Google Antigravity accounts with shared memory, conversations, and settings.
+Includes real-time token tracking, quota resets, and anti-burnout safety.
+"""
+
+import sys
+import os
+import time
+import argparse
+import subprocess
+import threading
+from pathlib import Path
+
+# Add directory containing agy_accounts_backend
+sys.path.insert(0, str(Path.home() / ".local" / "bin"))
+import agy_accounts_backend as backend
+
+def cmd_list(args):
+    backend.sync_tokens_and_active_account()
+    index = backend.load_accounts_index()
+    accounts = index.get("accounts", [])
+    active_email = index.get("active")
+
+    print("\n" + "═" * 78)
+    print("  GOOGLE ANTIGRAVITY — ПУЛ АККАУНТОВ & СТАТУС КВОТЫ")
+    print("═" * 78)
+
+    if not accounts:
+        print(" В пуле нет зарегистрированных аккаунтов.")
+        print(" Добавьте аккаунт командой: agy-account add")
+        print("═" * 78)
+        return
+
+    print(f" {'#':<3} {'АККАУНТ':<30} {'СТАТУС':<14} {'ТОКЕНЫ':<12} {'РЕФИЛ / СБРОС':<16}")
+    print("─" * 78)
+
+    for i, acc in enumerate(accounts, 1):
+        email = acc["email"]
+        alias = acc.get("alias", "")
+        alias_str = f"({alias})" if alias and alias != email else ""
+        disp_name = f"{email} {alias_str}"[:29]
+
+        is_active = (email == active_email)
+        ready, status_badge, status_desc, rem_secs = backend.is_account_ready(acc)
+
+        if is_active:
+            status_text = "▶ АКТИВЕН"
+        elif ready:
+            status_text = "● ГОТОВ"
+        else:
+            status_text = f"⏳ {status_badge}"
+
+        tokens = acc.get("tokens", {})
+        total_tok = backend.format_tokens(tokens.get("total", 0))
+
+        if rem_secs > 0:
+            m = rem_secs // 60
+            s = rem_secs % 60
+            reset_text = f"через {m:02d}:{s:02d}"
+        elif is_active:
+            reset_text = "используется"
+        else:
+            reset_text = "готов"
+
+        print(f" {i:<3} {disp_name:<30} {status_text:<14} {total_tok:<12} {reset_text:<16}")
+
+    print("─" * 78)
+    auto_sw = "ВКЛ" if index.get("auto_switch_enabled", True) else "ВЫКЛ"
+    cb = "АКТИВЕН (пауза)" if index.get("circuit_breaker_active", False) else "НОРМА"
+    print(f" Автопереключение: {auto_sw} | Защита от 126ч бана: {cb} | Всего в пуле: {len(accounts)}/{backend.POOL_TARGET_ACCOUNTS}")
+    print("═" * 78)
+    print(" Команды:")
+    print("   agy-account next             - переключить на следующий готовый аккаунт")
+    print("   agy-account switch <target>  - переключить на конкретный аккаунт")
+    print("   agy-account add [alias]      - добавить следующий Google-аккаунт в пул")
+    print("   agy-account gui              - открыть графическое приложение")
+    print("   agy-account tokens           - детальная статистика токенов в реальном времени\n")
+
+def cmd_current(args):
+    backend.sync_tokens_and_active_account()
+    index = backend.load_accounts_index()
+    active_email = index.get("active")
+    if not active_email:
+        sec = backend.get_keyring_secret()
+        active_email = backend.extract_email(sec) if sec else None
+
+    if active_email:
+        acc = next((a for a in index.get("accounts", []) if a["email"] == active_email), None)
+        alias = acc.get("alias", "") if acc else ""
+        alias_info = f" ({alias})" if alias else ""
+        toks = acc.get("tokens", {}) if acc else {}
+        total_tok = backend.format_tokens(toks.get("total", 0))
+        print(f"Активный аккаунт: {active_email}{alias_info} | Токенов использовано: {total_tok}")
+    else:
+        print("Активный аккаунт не обнаружен в системе.")
+
+def cmd_tokens(args):
+    backend.sync_tokens_and_active_account()
+    index = backend.load_accounts_index()
+    accounts = index.get("accounts", [])
+    trans = backend.scan_all_transcripts()
+    wins = trans.get("windows", {})
+    quota_live = backend.fetch_live_google_quota(sync=True)
+    agy_q = quota_live.get("antigravity", {}) or quota_live.get("models", {}).get("Gemini Models", {})
+
+    print("\n" + "═" * 80)
+    print("  ОФИЦИАЛЬНЫЕ ЛИМИТЫ КВОТЫ ANTIGRAVITY (LIVE GOOGLE QUOTA API)")
+    print("═" * 80)
+    print(f" {'ОКНО КВОТЫ ANTIGRAVITY':<28} {'ПОТРАЧЕНО':<12} {'ОСТАЛОСЬ':<11} {'ИЗ ЛИМИТА (ВЫХОД)':<18} {'РЕФИЛ / СБРОС':<14}")
+    print("─" * 80)
+
+    # 5-hour Antigravity
+    q_5h = agy_q.get("Five Hour Limit Remaining", {})
+    u_5h = q_5h.get("used_pct", 0)
+    r_5h = q_5h.get("remaining_pct", 100)
+    rst_5h = q_5h.get("reset_str", "—")
+    out_5h = wins.get("5h", {}).get("output", 0)
+    lim_5h = int(out_5h / (u_5h / 100.0)) if u_5h > 0 else 500000
+    tok_str_5h = f"{backend.format_tokens(out_5h)} / ~{backend.format_tokens(lim_5h)}"
+    print(f" {'Antigravity: 5 Часов (Сессия)':<28} {str(u_5h)+'%':<12} {str(r_5h)+'%':<11} {tok_str_5h:<18} {rst_5h:<11}")
+
+    # Weekly Antigravity
+    q_wk = agy_q.get("Weekly Limit Remaining", {})
+    u_wk = q_wk.get("used_pct", 0)
+    r_wk = q_wk.get("remaining_pct", 100)
+    rst_wk = q_wk.get("reset_str", "—")
+    out_wk = wins.get("7d", {}).get("output", 0)
+    lim_wk = int(out_wk / (u_wk / 100.0)) if u_wk > 0 else 2500000
+    tok_str_wk = f"{backend.format_tokens(out_wk)} / ~{backend.format_tokens(lim_wk)}"
+    print(f" {'Antigravity: 7 Дней (Неделя)':<28} {str(u_wk)+'%':<12} {str(r_wk)+'%':<11} {tok_str_wk:<18} {rst_wk:<11}")
+    print("═" * 80)
+
+    print("\n" + "═" * 80)
+    print("  РАСХОД ТОКЕНОВ ANTIGRAVITY ПО ВСЕМ ПЕРИОДАМ (ВХОД, ВЫХОД, КЭШ)")
+    print("═" * 80)
+    print(f" {'ПЕРИОД ANTIGRAVITY':<22} {'ИТОГО':<12} {'ВХОД (PROMPT)':<16} {'ВЫХОД (MODEL)':<16} {'КЭШ (CONTEXT)':<14}")
+    print("─" * 80)
+
+    order = [("5h", "5 часов (Сессия)"), ("24h", "24 часа (День)"), ("7d", "7 дней (Неделя)"), ("30d", "30 дней (Месяц)")]
+    for k, lbl in order:
+        w = wins.get(k, {})
+        tot = backend.format_tokens(w.get("total", 0))
+        inp = backend.format_tokens(w.get("input", 0))
+        out = backend.format_tokens(w.get("output", 0))
+        cch = backend.format_tokens(w.get("cache", 0))
+        print(f" {lbl:<22} {tot:<12} {inp:<16} {out:<16} {cch:<14}")
+
+    all_tot = backend.format_tokens(trans["total"])
+    all_inp = backend.format_tokens(trans["input"])
+    all_out = backend.format_tokens(trans["output"])
+    all_cch = backend.format_tokens(trans["cache"])
+    print("─" * 80)
+    print(f" {'Всё время (Total)':<22} {all_tot:<12} {all_inp:<16} {all_out:<16} {all_cch:<14}")
+    print("═" * 80)
+
+    print(" Распределение по аккаунтам пула:")
+    for acc in accounts:
+        email = acc["email"]
+        alias = acc.get("alias", "")
+        t = acc.get("tokens", {})
+        is_act = "▶ " if email == index.get("active") else "  "
+        print(f" {is_act}{email} ({alias}):")
+        w_acc = acc.get("windows", {})
+        w5 = backend.format_tokens(w_acc.get("5h", {}).get("total", t.get("total", 0)))
+        w24 = backend.format_tokens(w_acc.get("24h", {}).get("total", t.get("today", 0)))
+        w7 = backend.format_tokens(w_acc.get("7d", {}).get("total", t.get("total", 0)))
+        w30 = backend.format_tokens(w_acc.get("30d", {}).get("total", t.get("total", 0)))
+        print(f"     5 часов: {w5} | 24 часа: {w24} | 7 дней: {w7} | 30 дней: {w30} | Всего: {backend.format_tokens(t.get('total', 0))}")
+    print("═" * 80 + "\n")
+
+def cmd_switch(args):
+    if not args.target:
+        index = backend.load_accounts_index()
+        accounts = index.get("accounts", [])
+        if not accounts:
+            print("В пуле нет аккаунтов. Добавьте: agy-account add", file=sys.stderr)
+            sys.exit(1)
+        # Try fzf if available
+        try:
+            choices = "\n".join([f"{a['email']} ({a.get('alias', '')})" for a in accounts])
+            p = subprocess.run(["fzf", "--prompt=Выберите аккаунт Antigravity > "], input=choices, text=True, capture_output=True)
+            if p.returncode == 0 and p.stdout.strip():
+                args.target = p.stdout.strip().split()[0]
+        except Exception:
+            pass
+
+        if not args.target:
+            print("Выберите аккаунт:")
+            for i, a in enumerate(accounts, 1):
+                print(f"  {i}) {a['email']} ({a.get('alias', '')})")
+            try:
+                choice = input("Введите номер или email: ").strip()
+                if choice.isdigit() and 1 <= int(choice) <= len(accounts):
+                    args.target = accounts[int(choice) - 1]["email"]
+                else:
+                    args.target = choice
+            except (KeyboardInterrupt, EOFError):
+                print("\nОтменено.")
+                return
+
+    success, msg = backend.switch_to_account(args.target, force=args.force)
+    if success:
+        print(f"✓ {msg}")
+        if getattr(args, "continue_session", False):
+            os.execvp("agy", ["agy", "--continue"])
+    else:
+        print(f"Ошибка: {msg}", file=sys.stderr)
+        sys.exit(1)
+
+def cmd_next(args):
+    index = backend.load_accounts_index()
+    accounts = index.get("accounts", [])
+
+    if len(accounts) < 2:
+        active_email = index.get("active") or "один аккаунт"
+        msg = f"В пуле только 1 аккаунт ({active_email}). Открываю окно добавления следующего..."
+        print(msg)
+        backend.notify("Google Antigravity", msg)
+        cmd = ["omarchy-launch-tui", "--app-id=org.omarchy.agent", "agy-account", "add", "второй"]
+        subprocess.Popen(cmd)
+        return
+
+    success, msg = backend.rotate_to_next_ready(force=args.force)
+    if success:
+        print(f"✓ {msg}")
+        if getattr(args, "continue_session", False):
+            os.execvp("agy", ["agy", "--continue"])
+    else:
+        print(f"⚠️ {msg}")
+
+def cmd_add(args):
+    # If not running in a terminal, launch in floating terminal window
+    if not sys.stdin.isatty():
+        cmd = ["omarchy-launch-tui", "--app-id=org.omarchy.agent", "agy-account", "add"]
+        if getattr(args, "alias", None):
+            cmd.append(args.alias)
+        subprocess.Popen(cmd)
+        return
+
+    # 1. Preserve current credentials before wiping
+    curr_secret = backend.get_keyring_secret()
+    curr_email = None
+    if curr_secret:
+        curr_email = backend.extract_email(curr_secret)
+        if curr_email:
+            backend.save_account_credentials(curr_email, curr_secret)
+            print(f"Текущий аккаунт ({curr_email}) надёжно сохранён в пуле.")
+
+    # 2. Clear Keyring to force OAuth
+    backend.clear_keyring_secret()
+
+    print("\n" + "═" * 68)
+    print(" ДОБАВЛЕНИЕ НОВОГО GOOGLE-АККАУНТА В ПУЛ ANTIGRAVITY")
+    print("═" * 68)
+    print(" 1. Сейчас откроется Antigravity и окно браузера Google Chrome.")
+    print(" 2. Войдите в ваш следующий аккаунт Google и подтвердите доступ.")
+    print(" 3. Как только вход завершится, новый аккаунт автоматически")
+    print("    сохранится в защищенный пул и будет готов к авторотации!")
+    print("═" * 68 + "\n")
+    print("Нажмите Enter для продолжения...")
+    try:
+        input()
+    except (KeyboardInterrupt, EOFError):
+        if curr_secret:
+            backend.set_keyring_secret(curr_secret)
+        print("\nОтменено.")
+        return
+
+    real_agy = Path.home() / ".local" / "bin" / "agy.bin"
+    if not real_agy.exists():
+        real_agy = Path.home() / ".local" / "bin" / "agy"
+
+    p = subprocess.Popen([str(real_agy), "--mode=accept-edits"])
+    detected_email = [None]
+
+    try:
+        while p.poll() is None:
+            sec = backend.get_keyring_secret()
+            if sec:
+                em = backend.extract_email(sec)
+                if em and em != curr_email:
+                    detected_email[0] = em
+                    alias = getattr(args, "alias", None) or em.split("@")[0]
+                    backend.save_account_credentials(em, sec, alias)
+                    backend.notify("Google Antigravity", f"✓ Зарегистрирован новый аккаунт: {em} ({alias})")
+                    print(f"\n✓ Успешно получен токен для: {em} ({alias})!")
+                    print("Сохраняю в пул и завершаю процесс авторизации...")
+                    time.sleep(2)
+                    p.terminate()
+                    try:
+                        p.wait(timeout=3)
+                    except Exception:
+                        p.kill()
+                    break
+            time.sleep(1)
+    except KeyboardInterrupt:
+        p.terminate()
+
+    if detected_email[0]:
+        print(f"\n✓ Аккаунт {detected_email[0]} успешно добавлен в пул!")
+        print("Окно закроется через 3 секунды...")
+        time.sleep(3)
+        return
+
+    # Final verification in case process exited normally
+    new_secret = backend.get_keyring_secret()
+    if new_secret:
+        new_email = backend.extract_email(new_secret)
+        if new_email and new_email != curr_email:
+            alias = getattr(args, "alias", None) or new_email.split("@")[0]
+            backend.save_account_credentials(new_email, new_secret, alias)
+            print(f"\n✓ Успешно добавлен и активирован новый аккаунт: {new_email} ({alias})")
+            time.sleep(3)
+            return
+        elif new_email == curr_email:
+            print(f"\nВы вошли в тот же самый аккаунт ({curr_email}).")
+            time.sleep(2)
+            return
+
+    # If aborted without new login, restore previous
+    if curr_secret:
+        backend.set_keyring_secret(curr_secret)
+        print("\nАвторизация не завершена. Восстановлен прежний аккаунт.")
+        time.sleep(2)
+    else:
+        print("\nНовый аккаунт не зарегистрирован.")
+        time.sleep(2)
+
+def cmd_remove(args):
+    success, msg = backend.remove_account(args.target)
+    if success:
+        print(f"✓ {msg}")
+    else:
+        print(f"Ошибка: {msg}", file=sys.stderr)
+        sys.exit(1)
+
+def cmd_cooldown(args):
+    email = args.email
+    if not email:
+        index = backend.load_accounts_index()
+        email = index.get("active")
+    secs = getattr(args, "seconds", backend.DEFAULT_COOLDOWN_SECONDS)
+    reason = getattr(args, "reason", "Ручная установка кулдауна")
+    if backend.mark_account_cooldown(email, secs, reason):
+        print(f"✓ Аккаунт {email} отправлен на кулдаун на {secs // 60} минут.")
+    else:
+        print(f"Ошибка: аккаунт {email} не найден.")
+
+def cmd_reset_cooldown(args):
+    email = args.email
+    if not email:
+        index = backend.load_accounts_index()
+        email = index.get("active")
+    if backend.reset_account_cooldown(email):
+        print(f"✓ Кулдаун для {email} сброшен.")
+    else:
+        print(f"Ошибка: аккаунт {email} не найден.")
+
+def cmd_auto_switch(args):
+    index = backend.load_accounts_index()
+    if args.state:
+        state_bool = (args.state.lower() in ["on", "1", "true", "yes", "вкл"])
+        index["auto_switch_enabled"] = state_bool
+        backend.save_accounts_index(index)
+        state_str = "ВКЛЮЧЕНО" if state_bool else "ВЫКЛЮЧЕНО"
+        print(f"✓ Автоматическое переключение при исчерпании лимита: {state_str}")
+    else:
+        curr = "ВКЛЮЧЕНО" if index.get("auto_switch_enabled", True) else "ВЫКЛЮЧЕНО"
+        print(f"Автоматическое переключение: {curr}")
+
+def cmd_gui(args):
+    gui_bin = Path.home() / ".local" / "bin" / "agy-accounts-gui"
+    if gui_bin.exists():
+        subprocess.Popen([str(gui_bin)])
+    else:
+        print(f"Ошибка: {gui_bin} не найден", file=sys.stderr)
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="agy-account",
+        description="Google Antigravity Multi-Account Manager & Auto-Rotation CLI"
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    # list
+    p_list = subparsers.add_parser("list", aliases=["ls"], help="Список аккаунтов и статус квот")
+    p_list.set_defaults(func=cmd_list)
+
+    # current
+    p_curr = subparsers.add_parser("current", aliases=["whoami"], help="Текущий активный аккаунт")
+    p_curr.set_defaults(func=cmd_current)
+
+    # tokens
+    p_tok = subparsers.add_parser("tokens", aliases=["stats"], help="Детальная статистика токенов")
+    p_tok.set_defaults(func=cmd_tokens)
+
+    # switch
+    p_switch = subparsers.add_parser("switch", aliases=["use"], help="Переключить на аккаунт")
+    p_switch.add_argument("target", nargs="?", help="Email или алиас аккаунта")
+    p_switch.add_argument("-c", "--continue", dest="continue_session", action="store_true", help="Продолжить сессию")
+    p_switch.add_argument("-f", "--force", action="store_true", help="Принудительно без кулдауна")
+    p_switch.set_defaults(func=cmd_switch)
+
+    # next / rotate
+    p_next = subparsers.add_parser("next", aliases=["rotate"], help="Переключить на следующий готовый аккаунт")
+    p_next.add_argument("-c", "--continue", dest="continue_session", action="store_true", help="Продолжить сессию")
+    p_next.add_argument("-f", "--force", action="store_true", help="Принудительно без кулдауна")
+    p_next.set_defaults(func=cmd_next)
+
+    # add
+    p_add = subparsers.add_parser("add", help="Войти в следующий Google-аккаунт")
+    p_add.add_argument("alias", nargs="?", help="Псевдоним (например: второй, work)")
+    p_add.set_defaults(func=cmd_add)
+
+    # remove
+    p_rm = subparsers.add_parser("remove", aliases=["rm"], help="Удалить аккаунт из пула")
+    p_rm.add_argument("target", help="Email или псевдоним")
+    p_rm.set_defaults(func=cmd_remove)
+
+    # sync
+    p_sync = subparsers.add_parser("sync", help="Синхронизировать токены и ключи")
+    p_sync.set_defaults(func=lambda args: backend.sync_tokens_and_active_account())
+
+    # cooldown
+    p_cd = subparsers.add_parser("cooldown", help="Установить кулдаун на аккаунт")
+    p_cd.add_argument("email", nargs="?", help="Email аккаунта")
+    p_cd.add_argument("--seconds", type=int, default=1800, help="Длительность кулдауна в секундах")
+    p_cd.add_argument("--reason", default="Ручной кулдаун", help="Причина")
+    p_cd.set_defaults(func=cmd_cooldown)
+
+    # reset-cooldown
+    p_rcd = subparsers.add_parser("reset-cooldown", help="Сбросить кулдаун на аккаунте")
+    p_rcd.add_argument("email", nargs="?", help="Email аккаунта")
+    p_rcd.set_defaults(func=cmd_reset_cooldown)
+
+    # auto-switch
+    p_as = subparsers.add_parser("auto-switch", help="Включить/выключить автопереключение при лимите")
+    p_as.add_argument("state", nargs="?", choices=["on", "off", "1", "0"], help="on или off")
+    p_as.set_defaults(func=cmd_auto_switch)
+
+    # gui
+    p_gui = subparsers.add_parser("gui", help="Открыть графический интерфейс управления аккаунтами")
+    p_gui.set_defaults(func=cmd_gui)
+
+    args = parser.parse_args()
+    if not args.command:
+        cmd_list(args)
+    else:
+        args.func(args)
+
+if __name__ == "__main__":
+    main()

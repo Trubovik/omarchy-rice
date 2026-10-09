@@ -1,0 +1,756 @@
+#!/usr/bin/env python3
+"""
+Antigravity Multi-Account Dashboard (agy-accounts-gui)
+Modern Libadwaita / GTK4 application for managing Google Antigravity accounts,
+monitoring real-time token consumption, quota resets, and auto-rotation readiness.
+"""
+
+import sys
+import os
+import time
+import subprocess
+from pathlib import Path
+
+# Add backend directory
+sys.path.insert(0, str(Path.home() / ".local" / "bin"))
+import agy_accounts_backend as backend
+
+import gi
+gi.require_version('Gtk', '4.0')
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Adw, GLib, Gdk, Pango
+
+APP_ID = "org.omarchy.AntigravityAccounts"
+
+CUSTOM_CSS = """
+.status-badge-active {
+    background-color: alpha(@accent_color, 0.25);
+    color: @accent_color;
+    border: 1px solid alpha(@accent_color, 0.6);
+    border-radius: 9999px;
+    padding: 3px 10px;
+    font-weight: bold;
+    font-size: 11px;
+}
+.status-badge-ready {
+    background-color: alpha(#26a269, 0.2);
+    color: #2ec27e;
+    border: 1px solid alpha(#2ec27e, 0.5);
+    border-radius: 9999px;
+    padding: 3px 10px;
+    font-weight: bold;
+    font-size: 11px;
+}
+.status-badge-cooldown {
+    background-color: alpha(#e66100, 0.25);
+    color: #ff7800;
+    border: 1px solid alpha(#ff7800, 0.6);
+    border-radius: 9999px;
+    padding: 3px 10px;
+    font-weight: bold;
+    font-size: 11px;
+}
+.status-badge-empty {
+    background-color: alpha(@window_fg_color, 0.08);
+    color: alpha(@window_fg_color, 0.6);
+    border: 1px dashed alpha(@window_fg_color, 0.3);
+    border-radius: 9999px;
+    padding: 3px 10px;
+    font-size: 11px;
+}
+.stat-box {
+    background-color: alpha(@window_fg_color, 0.04);
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+.stat-title {
+    font-size: 11px;
+    opacity: 0.7;
+    font-weight: 500;
+}
+.stat-value {
+    font-size: 14px;
+    font-weight: bold;
+}
+.hero-box {
+    background-color: alpha(@window_fg_color, 0.05);
+    border: 1px solid alpha(@window_fg_color, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+}
+.account-card {
+    background-color: alpha(@window_fg_color, 0.04);
+    border: 1px solid alpha(@window_fg_color, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+}
+.account-card-active {
+    background-color: alpha(@accent_color, 0.08);
+    border: 1.5px solid alpha(@accent_color, 0.5);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+}
+.account-card-empty {
+    border: 1.5px dashed alpha(@window_fg_color, 0.18);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 10px;
+}
+.window-pill {
+    background-color: alpha(@window_fg_color, 0.05);
+    border: 1px solid alpha(@window_fg_color, 0.09);
+    border-radius: 9px;
+    padding: 8px 12px;
+}
+.window-title {
+    font-size: 11px;
+    opacity: 0.75;
+    font-weight: 600;
+}
+.window-value {
+    font-size: 15px;
+    font-weight: 800;
+}
+.window-reset {
+    font-size: 11px;
+    color: @accent_color;
+    font-weight: 600;
+}
+.mini-pill {
+    background-color: alpha(@window_fg_color, 0.04);
+    border: 1px solid alpha(@window_fg_color, 0.07);
+    border-radius: 7px;
+    padding: 5px 8px;
+}
+.mini-title {
+    font-size: 10px;
+    opacity: 0.7;
+    font-weight: bold;
+}
+.mini-value {
+    font-size: 12px;
+    font-weight: bold;
+}
+.mini-reset {
+    font-size: 10px;
+    color: @accent_color;
+    font-weight: 500;
+}
+"""
+
+class AccountsWindow(Adw.ApplicationWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.set_default_size(780, 750)
+        self.set_title("Google Antigravity Accounts")
+
+        self.last_poll_sync = 0
+        self.poll_counter = 0
+
+        self._build_ui()
+        self._apply_css()
+        self.refresh_ui()
+
+        # Timer: polls UI every 1 second (updates countdowns and periodic token deltas)
+        GLib.timeout_add(1000, self.on_timer_tick)
+
+    def _apply_css(self):
+        provider = Gtk.CssProvider()
+        provider.load_from_string(CUSTOM_CSS)
+        display = Gdk.Display.get_default()
+        if display:
+            Gtk.StyleContext.add_provider_for_display(
+                display, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            )
+
+    def _build_ui(self):
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_content(main_box)
+
+        # HeaderBar
+        header = Adw.HeaderBar()
+        title_widget = Adw.WindowTitle(
+            title="Google Antigravity",
+            subtitle=f"Управление {backend.POOL_TARGET_ACCOUNTS} аккаунтами • Рефилы и квоты токенов • Защита от 126ч бана"
+        )
+        header.set_title_widget(title_widget)
+
+        # Add Account button
+        btn_add = Gtk.Button(label=" Добавить аккаунт")
+        btn_add.set_icon_name("list-add-symbolic")
+        btn_add.add_css_class("suggested-action")
+        btn_add.connect("clicked", lambda b: self.launch_add_account_wizard())
+        header.pack_start(btn_add)
+
+        # Rotate button
+        btn_rotate = Gtk.Button(label="Ротация")
+        btn_rotate.set_icon_name("view-refresh-symbolic")
+        btn_rotate.set_tooltip_text("Переключиться на следующий готовый аккаунт (SUPER+ALT+A)")
+        btn_rotate.connect("clicked", lambda b: self.on_rotate_clicked())
+        header.pack_end(btn_rotate)
+
+        # Manual Refresh button
+        btn_refresh = Gtk.Button()
+        btn_refresh.set_icon_name("view-refresh-symbolic")
+        btn_refresh.set_tooltip_text("Обновить данные и токены")
+        btn_refresh.connect("clicked", lambda b: self.on_manual_refresh())
+        header.pack_end(btn_refresh)
+
+        main_box.append(header)
+
+        # Scrolled Window
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_hexpand(True)
+        main_box.append(scrolled)
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(820)
+        clamp.set_tightening_threshold(600)
+        scrolled.set_child(clamp)
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        content_box.set_margin_top(16)
+        content_box.set_margin_bottom(24)
+        content_box.set_margin_start(16)
+        content_box.set_margin_end(16)
+        clamp.set_child(content_box)
+        self.content_box = content_box
+
+        # Hero Summary Container
+        self.hero_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.hero_box.add_css_class("hero-box")
+        content_box.append(self.hero_box)
+
+        # Switch & Protection group
+        pref_group = Adw.PreferencesGroup()
+        content_box.append(pref_group)
+
+        self.switch_auto = Adw.SwitchRow()
+        self.switch_auto.set_title("Автоматическое переключение при исчерпании токенов")
+        self.switch_auto.set_subtitle("При ошибке 429 безопасно активирует следующий готовый аккаунт")
+        self.switch_auto.connect("notify::active", self.on_auto_switch_toggled)
+        pref_group.add(self.switch_auto)
+
+        row_safe = Adw.ActionRow()
+        row_safe.set_title("Защита от 126-часового бана Google: АКТИВНА")
+        row_safe.set_subtitle("Кулдаун 45 сек • Общая память через файлы проекта • Предохранитель останова")
+        img_safe = Gtk.Image.new_from_icon_name("security-high-symbolic")
+        row_safe.add_prefix(img_safe)
+        pref_group.add(row_safe)
+
+        # Section Header for Accounts
+        sec_header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        self.lbl_sec_title = Gtk.Label(label=f"АККАУНТЫ В ПУЛЕ (1 / {backend.POOL_TARGET_ACCOUNTS})")
+        self.lbl_sec_title.add_css_class("heading")
+        self.lbl_sec_title.set_halign(Gtk.Align.START)
+        sec_header_box.append(self.lbl_sec_title)
+
+        self.lbl_sec_ready = Gtk.Label(label="Готовы к автопереключению: 0")
+        self.lbl_sec_ready.add_css_class("dim-label")
+        self.lbl_sec_ready.set_halign(Gtk.Align.END)
+        self.lbl_sec_ready.set_hexpand(True)
+        sec_header_box.append(self.lbl_sec_ready)
+        content_box.append(sec_header_box)
+
+        # Container for Account Cards
+        self.cards_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        content_box.append(self.cards_box)
+
+    def on_auto_switch_toggled(self, row, param):
+        index = backend.load_accounts_index()
+        index["auto_switch_enabled"] = self.switch_auto.get_active()
+        backend.save_accounts_index(index)
+
+    def on_rotate_clicked(self):
+        success, msg = backend.rotate_to_next_ready()
+        self.refresh_ui()
+        if not success:
+            dialog = Adw.MessageDialog(
+                transient_for=self,
+                heading="Ротация аккаунтов",
+                body=msg
+            )
+            dialog.add_response("ok", "Понятно")
+            dialog.present()
+
+    def on_manual_refresh(self):
+        backend.sync_tokens_and_active_account()
+        self.refresh_ui()
+
+    def launch_add_account_wizard(self, slot_num=None):
+        alias = None
+        if slot_num:
+            names = {2: "второй", 3: "третий", 4: "четвертый", 5: "пятый"}
+            alias = names.get(slot_num, f"slot-{slot_num}")
+        cmd = ["omarchy-launch-tui", "--app-id=org.omarchy.agent", "agy-account", "add"]
+        if alias:
+            cmd.append(alias)
+        subprocess.Popen(cmd)
+
+    def on_timer_tick(self):
+        self.poll_counter += 1
+        now = time.time()
+        # Every 3 seconds do full sync from transcripts
+        if (now - self.last_poll_sync) >= 3:
+            self.last_poll_sync = now
+            backend.sync_tokens_and_active_account()
+        self.refresh_ui()
+        return True
+
+    def refresh_ui(self):
+        index = backend.load_accounts_index()
+        accounts = index.get("accounts", [])
+        active_email = index.get("active")
+        auto_enabled = index.get("auto_switch_enabled", True)
+
+        # Temporarily block signal to avoid recursion
+        self.switch_auto.handler_block_by_func(self.on_auto_switch_toggled)
+        self.switch_auto.set_active(auto_enabled)
+        self.switch_auto.handler_unblock_by_func(self.on_auto_switch_toggled)
+
+        # 1. Update Hero Box
+        trans = backend.scan_all_transcripts()
+        wins = trans.get("windows", {})
+        total_tok = trans.get("total", 0)
+        today_tok = trans.get("today", 0)
+        inp_tok = trans.get("input", 0)
+        out_tok = trans.get("output", 0)
+        cch_tok = trans.get("cache", 0)
+
+        # Count ready accounts
+        ready_count = 0
+        for acc in accounts:
+            r, _, _, _ = backend.is_account_ready(acc)
+            if r and acc["email"] != active_email:
+                ready_count += 1
+
+        # Clear Hero Box
+        while self.hero_box.get_first_child():
+            self.hero_box.remove(self.hero_box.get_first_child())
+
+        hero_top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        avatar = Adw.Avatar(size=44, text=active_email or "Antigravity", show_initials=True)
+        hero_top.append(avatar)
+
+        hero_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        lbl_act_title = Gtk.Label(label="АКТИВНЫЙ АККАУНТ")
+        lbl_act_title.add_css_class("stat-title")
+        lbl_act_title.set_halign(Gtk.Align.START)
+        hero_text.append(lbl_act_title)
+
+        active_disp = active_email or "Не выбран"
+        active_acc = next((a for a in accounts if a["email"] == active_email), None)
+        if active_acc and active_acc.get("alias"):
+            active_disp += f" ({active_acc.get('alias')})"
+
+        lbl_act_email = Gtk.Label(label=active_disp)
+        lbl_act_email.add_css_class("title-3")
+        lbl_act_email.set_halign(Gtk.Align.START)
+        hero_text.append(lbl_act_email)
+        hero_top.append(hero_text)
+
+        # Status badge for active account
+        badge_act = Gtk.Label(label="● В РАБОТЕ")
+        badge_act.add_css_class("status-badge-active")
+        badge_act.set_halign(Gtk.Align.END)
+        badge_act.set_hexpand(True)
+        hero_top.append(badge_act)
+        self.hero_box.append(hero_top)
+
+        # Quota Live API data
+        quota_live = backend.fetch_live_google_quota()
+        agy_q = quota_live.get("antigravity", {}) or quota_live.get("models", {}).get("Gemini Models", {})
+
+        q_5h = agy_q.get("Five Hour Limit Remaining", {})
+        u_5h = q_5h.get("used_pct", 72)
+        r_5h = q_5h.get("remaining_pct", 28)
+        rst_5h = q_5h.get("reset_str", "1ч 40м")
+
+        q_wk = agy_q.get("Weekly Limit Remaining", {})
+        u_wk = q_wk.get("used_pct", 16)
+        r_wk = q_wk.get("remaining_pct", 84)
+        rst_wk = q_wk.get("reset_str", "5д 20ч")
+
+        out_5h = wins.get("5h", {}).get("output", out_tok)
+        lim_5h = int(out_5h / (u_5h / 100.0)) if u_5h > 0 else 500000
+
+        out_wk = wins.get("7d", {}).get("output", out_tok)
+        lim_wk = int(out_wk / (u_wk / 100.0)) if u_wk > 0 else 2500000
+
+        # Quota Windows Header
+        lbl_q_hdr = Gtk.Label(label="ОФИЦИАЛЬНЫЕ ЛИМИТЫ КВОТЫ И РАСХОД ANTIGRAVITY")
+        lbl_q_hdr.add_css_class("stat-title")
+        lbl_q_hdr.set_halign(Gtk.Align.START)
+        lbl_q_hdr.set_margin_top(6)
+        self.hero_box.append(lbl_q_hdr)
+
+        # 4 Quota Windows Tiles
+        wins_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        wins_row.set_homogeneous(True)
+
+        def make_window_tile(title, val_tok, pct_used, reset_str, sub_info=""):
+            b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            b.add_css_class("window-pill")
+
+            lt = Gtk.Label(label=title)
+            lt.add_css_class("window-title")
+            lt.set_halign(Gtk.Align.START)
+            b.append(lt)
+
+            lv = Gtk.Label(label=val_tok)
+            lv.add_css_class("window-value")
+            lv.set_halign(Gtk.Align.START)
+            b.append(lv)
+
+            # Progress Bar for limit
+            pbar = Gtk.ProgressBar()
+            pbar.set_fraction(min(1.0, max(0.0, pct_used / 100.0)))
+            pbar.set_margin_top(2)
+            pbar.set_margin_bottom(2)
+            b.append(pbar)
+
+            lr = Gtk.Label(label=f"Рефил: {reset_str} (исп. {pct_used}%)")
+            lr.add_css_class("window-reset")
+            lr.set_halign(Gtk.Align.START)
+            b.append(lr)
+
+            if sub_info:
+                ls = Gtk.Label(label=sub_info)
+                ls.add_css_class("caption")
+                ls.add_css_class("dim-label")
+                ls.set_halign(Gtk.Align.START)
+                b.append(ls)
+            return b
+
+        str_5h = f"{backend.format_tokens(out_5h)} / ~{backend.format_tokens(lim_5h)}"
+        str_wk = f"{backend.format_tokens(out_wk)} / ~{backend.format_tokens(lim_wk)}"
+
+        # 24h & 30d stats
+        w_24h = wins.get("24h", {})
+        out_24h = w_24h.get("output", out_tok)
+        tot_24h = w_24h.get("total", today_tok)
+        rst_24h = w_24h.get("next_reset_str", "—")
+
+        w_30d = wins.get("30d", {})
+        out_30d = w_30d.get("output", out_tok)
+        tot_30d = w_30d.get("total", total_tok)
+        rst_30d = w_30d.get("next_reset_str", "—")
+
+        wins_row.append(make_window_tile("ANTIGRAVITY: 5 ЧАСОВ (СЕССИЯ)", str_5h, u_5h, rst_5h, f"Осталось: {r_5h}% квоты"))
+        wins_row.append(make_window_tile("ANTIGRAVITY: 24 ЧАСА (ДЕНЬ)", f"{backend.format_tokens(out_24h)} (выход)", min(100, u_5h), rst_24h, f"Всего за сутки: {backend.format_tokens(tot_24h)}"))
+        wins_row.append(make_window_tile("ANTIGRAVITY: 7 ДНЕЙ (НЕДЕЛЯ)", str_wk, u_wk, rst_wk, f"Осталось: {r_wk}% квоты"))
+        wins_row.append(make_window_tile("ANTIGRAVITY: 30 ДНЕЙ (МЕСЯЦ)", f"{backend.format_tokens(out_30d)} (выход)", min(100, u_wk), rst_30d, f"Всего за месяц: {backend.format_tokens(tot_30d)}"))
+        self.hero_box.append(wins_row)
+
+        # Summary Bottom Row
+        summary_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        summary_row.set_homogeneous(True)
+
+        def make_summary_tile(title, val_str, sub_str=""):
+            b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            b.add_css_class("stat-box")
+            lt = Gtk.Label(label=title)
+            lt.add_css_class("stat-title")
+            lt.set_halign(Gtk.Align.START)
+            b.append(lt)
+
+            lv = Gtk.Label(label=val_str)
+            lv.add_css_class("stat-value")
+            lv.set_halign(Gtk.Align.START)
+            b.append(lv)
+
+            if sub_str:
+                ls = Gtk.Label(label=sub_str)
+                ls.add_css_class("caption")
+                ls.add_css_class("dim-label")
+                ls.set_halign(Gtk.Align.START)
+                b.append(ls)
+            return b
+
+        summary_row.append(make_summary_tile("ОБЩИЙ РАСХОД ТОКЕНОВ", backend.format_tokens(total_tok), f"Вход: {backend.format_tokens(inp_tok)} • Выход: {backend.format_tokens(out_tok)} • Кэш: {backend.format_tokens(cch_tok)}"))
+        summary_row.append(make_summary_tile("ГОТОВНОСТЬ ПУЛА", f"{ready_count} из {max(0, len(accounts)-1)} готовы к ротации", "Защита от 126ч бана активна"))
+        self.hero_box.append(summary_row)
+
+        # 2. Update section titles
+        self.lbl_sec_title.set_label(f"АККАУНТЫ В ПУЛЕ ({len(accounts)} / {backend.POOL_TARGET_ACCOUNTS})")
+        self.lbl_sec_ready.set_label(f"Резервных готовы к переключению: {ready_count}")
+
+        # 3. Rebuild Account Cards
+        while self.cards_box.get_first_child():
+            self.cards_box.remove(self.cards_box.get_first_child())
+
+        # Render populated account cards
+        for i, acc in enumerate(accounts, 1):
+            card = self._create_account_card(i, acc, active_email, trans)
+            self.cards_box.append(card)
+
+        # If less than 4 accounts, render empty slots up to 4
+        current_len = len(accounts)
+        for slot_idx in range(current_len + 1, backend.POOL_TARGET_ACCOUNTS + 1):
+            empty_card = self._create_empty_slot_card(slot_idx)
+            self.cards_box.append(empty_card)
+
+    def _create_account_card(self, idx, acc, active_email, trans=None):
+        email = acc["email"]
+        alias = acc.get("alias") or f"Аккаунт {idx}"
+        is_active = (email == active_email)
+
+        ready, status_badge, status_desc, rem_secs = backend.is_account_ready(acc)
+
+        card_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card_box.add_css_class("account-card-active" if is_active else "account-card")
+
+        # Top row: Avatar, Info, Status Badge
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        avatar = Adw.Avatar(size=36, text=alias or email, show_initials=True)
+        top_row.append(avatar)
+
+        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        lbl_email = Gtk.Label(label=email)
+        lbl_email.add_css_class("title-4")
+        lbl_email.set_halign(Gtk.Align.START)
+        info_box.append(lbl_email)
+
+        lbl_alias = Gtk.Label(label=f"Слот {idx} • Алиас: {alias}")
+        lbl_alias.add_css_class("dim-label")
+        lbl_alias.add_css_class("caption")
+        lbl_alias.set_halign(Gtk.Align.START)
+        info_box.append(lbl_alias)
+        top_row.append(info_box)
+
+        # Status badge
+        badge_lbl = Gtk.Label()
+        badge_lbl.set_halign(Gtk.Align.END)
+        badge_lbl.set_hexpand(True)
+        if is_active:
+            badge_lbl.set_label("▶ АКТИВЕН СЕЙЧАС")
+            badge_lbl.add_css_class("status-badge-active")
+        elif ready:
+            badge_lbl.set_label("● ГОТОВ К РОТАЦИИ")
+            badge_lbl.add_css_class("status-badge-ready")
+        else:
+            m = rem_secs // 60
+            s = rem_secs % 60
+            badge_lbl.set_label(f"⏳ КУЛДАУН ({m:02d}:{s:02d})")
+            badge_lbl.add_css_class("status-badge-cooldown")
+        top_row.append(badge_lbl)
+        card_box.append(top_row)
+
+        # Detail Grid
+        grid = Gtk.Grid()
+        grid.set_column_spacing(20)
+        grid.set_row_spacing(6)
+        grid.set_margin_start(48)
+
+        # Token stats
+        tok = acc.get("tokens", {})
+        acc_total = tok.get("total", 0)
+        acc_today = tok.get("today", 0)
+
+        # Col 0: Tokens
+        lbl_t_title = Gtk.Label(label="Потрачено токенов:")
+        lbl_t_title.add_css_class("dim-label")
+        lbl_t_title.set_halign(Gtk.Align.START)
+        grid.attach(lbl_t_title, 0, 0, 1, 1)
+
+        lbl_t_val = Gtk.Label(label=f"{backend.format_tokens(acc_total)} (за сегодня: {backend.format_tokens(acc_today)})")
+        lbl_t_val.add_css_class("caption")
+        lbl_t_val.set_halign(Gtk.Align.START)
+        grid.attach(lbl_t_val, 1, 0, 1, 1)
+
+        # Col 1: Quota Reset Status
+        lbl_q_title = Gtk.Label(label="Рефил / сброс квоты:")
+        lbl_q_title.add_css_class("dim-label")
+        lbl_q_title.set_halign(Gtk.Align.START)
+        grid.attach(lbl_q_title, 0, 1, 1, 1)
+
+        lbl_q_val = Gtk.Label(label=status_desc)
+        lbl_q_val.add_css_class("caption")
+        lbl_q_val.set_halign(Gtk.Align.START)
+        grid.attach(lbl_q_val, 1, 1, 1, 1)
+
+        # Col 2: Auto-switch Readiness
+        lbl_r_title = Gtk.Label(label="Автопереключение:")
+        lbl_r_title.add_css_class("dim-label")
+        lbl_r_title.set_halign(Gtk.Align.START)
+        grid.attach(lbl_r_title, 2, 0, 1, 1)
+
+        readiness_str = "Текущий активный" if is_active else ("Да, готов перехватить" if ready else "В ожидании кулдауна")
+        lbl_r_val = Gtk.Label(label=readiness_str)
+        lbl_r_val.add_css_class("caption")
+        lbl_r_val.set_halign(Gtk.Align.START)
+        grid.attach(lbl_r_val, 3, 0, 1, 1)
+
+        # Col 3: Last used
+        lbl_u_title = Gtk.Label(label="Использован:")
+        lbl_u_title.add_css_class("dim-label")
+        lbl_u_title.set_halign(Gtk.Align.START)
+        grid.attach(lbl_u_title, 2, 1, 1, 1)
+
+        last_used_raw = acc.get("last_used", "")
+        last_used_str = last_used_raw[:19].replace("T", " ") if last_used_raw else "Недавно"
+        lbl_u_val = Gtk.Label(label=last_used_str)
+        lbl_u_val.add_css_class("caption")
+        lbl_u_val.set_halign(Gtk.Align.START)
+        grid.attach(lbl_u_val, 3, 1, 1, 1)
+
+        card_box.append(grid)
+
+        # Quota Windows Strip for this account
+        if trans is None:
+            trans = backend.scan_all_transcripts()
+        global_wins = trans.get("windows", {})
+        w_acc = acc.get("windows", {})
+
+        win_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        win_box.set_margin_start(48)
+        win_box.set_margin_top(4)
+        win_box.set_homogeneous(True)
+
+        def make_acc_mini_pill(w_label, w_tot, w_rst):
+            p = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+            p.add_css_class("mini-pill")
+            pl = Gtk.Label(label=w_label)
+            pl.add_css_class("mini-title")
+            pl.set_halign(Gtk.Align.START)
+            p.append(pl)
+
+            pv = Gtk.Label(label=w_tot)
+            pv.add_css_class("mini-value")
+            pv.set_halign(Gtk.Align.START)
+            p.append(pv)
+
+            pr = Gtk.Label(label=f"рефил: {w_rst}")
+            pr.add_css_class("mini-reset")
+            pr.set_halign(Gtk.Align.START)
+            p.append(pr)
+            return p
+
+        for wk, w_name in [("5h", "5 ЧАСОВ"), ("24h", "24 ЧАСА"), ("7d", "7 ДНЕЙ"), ("30d", "30 ДНЕЙ")]:
+            acc_w = w_acc.get(wk, {})
+            gw = global_wins.get(wk, {})
+            w_total_num = acc_w.get("total", gw.get("total", 0) if is_active else 0)
+            w_rst_str = acc_w.get("next_reset_str", gw.get("next_reset_str", "—") if is_active else "свободна")
+            win_box.append(make_acc_mini_pill(w_name, backend.format_tokens(w_total_num), w_rst_str))
+
+        card_box.append(win_box)
+
+        # Action Buttons Row
+        actions_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        actions_row.set_margin_start(48)
+        actions_row.set_margin_top(4)
+
+        if not is_active:
+            btn_switch = Gtk.Button(label="Сделать активным")
+            btn_switch.set_icon_name("emblem-ok-symbolic")
+            btn_switch.add_css_class("flat")
+            btn_switch.connect("clicked", lambda b, em=email: self.on_switch_account(em))
+            actions_row.append(btn_switch)
+
+        if not ready and rem_secs > 0:
+            btn_reset_cd = Gtk.Button(label="Сбросить кулдаун")
+            btn_reset_cd.add_css_class("flat")
+            btn_reset_cd.connect("clicked", lambda b, em=email: self.on_reset_cooldown(em))
+            actions_row.append(btn_reset_cd)
+
+        index = backend.load_accounts_index()
+        all_accounts = index.get("accounts", [])
+        if len(all_accounts) > 1:
+            btn_del = Gtk.Button()
+            btn_del.set_icon_name("edit-delete-symbolic")
+            btn_del.set_tooltip_text("Удалить аккаунт из пула")
+            btn_del.add_css_class("flat")
+            btn_del.add_css_class("destructive-action")
+            btn_del.connect("clicked", lambda b, em=email: self.on_delete_account(em))
+            actions_row.append(btn_del)
+
+        card_box.append(actions_row)
+        return card_box
+
+    def _create_empty_slot_card(self, slot_idx):
+        card_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        card_box.add_css_class("account-card-empty")
+
+        icon = Gtk.Image.new_from_icon_name("list-add-symbolic")
+        icon.set_pixel_size(32)
+        icon.add_css_class("dim-label")
+        card_box.append(icon)
+
+        text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        lbl_title = Gtk.Label(label=f"Слот {slot_idx}: Google-аккаунт не подключен")
+        lbl_title.add_css_class("title-4")
+        lbl_title.set_halign(Gtk.Align.START)
+        text_box.append(lbl_title)
+
+        lbl_sub = Gtk.Label(label=f"Подключите аккаунт {slot_idx} для 5-кратного запаса токенов и непрерывной работы (пул рефилов)")
+        lbl_sub.add_css_class("dim-label")
+        lbl_sub.add_css_class("caption")
+        lbl_sub.set_halign(Gtk.Align.START)
+        text_box.append(lbl_sub)
+        card_box.append(text_box)
+
+        btn_add = Gtk.Button(label=f"+ Добавить аккаунт {slot_idx}")
+        btn_add.set_halign(Gtk.Align.END)
+        btn_add.set_hexpand(True)
+        btn_add.add_css_class("suggested-action")
+        btn_add.connect("clicked", lambda b, s=slot_idx: self.launch_add_account_wizard(s))
+        card_box.append(btn_add)
+
+        return card_box
+
+    def on_switch_account(self, email):
+        success, msg = backend.switch_to_account(email)
+        self.refresh_ui()
+        if not success:
+            dialog = Adw.MessageDialog(
+                transient_for=self,
+                heading="Переключение аккаунта",
+                body=msg
+            )
+            dialog.add_response("ok", "Понятно")
+            dialog.present()
+
+    def on_reset_cooldown(self, email):
+        backend.reset_account_cooldown(email)
+        self.refresh_ui()
+
+    def on_delete_account(self, email):
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="Удаление аккаунта",
+            body=f"Вы уверены, что хотите удалить аккаунт {email} из пула ротации?"
+        )
+        dialog.add_response("cancel", "Отмена")
+        dialog.add_response("delete", "Удалить")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+
+        def on_response(d, resp):
+            if resp == "delete":
+                backend.remove_account(email)
+                self.refresh_ui()
+
+        dialog.connect("response", on_response)
+        dialog.present()
+
+class AntigravityAccountsApp(Adw.Application):
+    def __init__(self):
+        super().__init__(
+            application_id=APP_ID,
+            flags=0
+        )
+
+    def do_activate(self):
+        win = self.props.active_window
+        if not win:
+            win = AccountsWindow(application=self)
+        win.present()
+
+def main():
+    app = AntigravityAccountsApp()
+    return app.run(sys.argv)
+
+if __name__ == "__main__":
+    sys.exit(main())

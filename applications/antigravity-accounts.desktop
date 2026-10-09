@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Antigravity Accounts
+GenericName=AI Agent Account & Quota Manager
+Comment=Manage Antigravity Google accounts, monitor real-time token usage and quotas
+Exec=/home/trubovik/.local/bin/agy-accounts-gui
+Icon=google-chrome
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+Keywords=agy;antigravity;account;accounts;tokens;quota;ai;
+StartupWMClass=org.omarchy.AntigravityAccounts

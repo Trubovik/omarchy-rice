@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Antigravity: Add Google Account
+GenericName=AI Agent Account Manager
+Comment=Add another Google account to the Antigravity pool (up to 5 accounts)
+Exec=omarchy-launch-tui --app-id=org.omarchy.agent agy-account add
+Icon=google-chrome
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+Keywords=agy;antigravity;account;login;

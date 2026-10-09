@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# omarchy:summary=Launch the default coding agent in a terminal (user wrapper with Google Antigravity support)
+# omarchy:args=[--inline] [--pick] [--prompt <text>]
+
+original_args=("$@")
+inline=false
+pick=false
+prompt=""
+
+while (($#)); do
+  case "$1" in
+    --inline)
+      inline=true
+      shift
+      ;;
+    --pick)
+      pick=true
+      shift
+      ;;
+    --prompt)
+      prompt=${2:?--prompt needs a value}
+      shift 2
+      ;;
+    *)
+      # Unrecognized options; pass through if delegating
+      shift
+      ;;
+  esac
+done
+
+agent=$("$HOME/.local/bin/omarchy-default-agent")
+
+if [[ -z $agent ]]; then
+  if [[ $pick == "true" ]]; then
+    exec omarchy-menu summon setup.default.agent
+  fi
+  echo "Choose default agent with: omarchy default agent <name>" >&2
+  exit 1
+fi
+
+if [[ "$agent" == "antigravity" || "$agent" == "agy" ]]; then
+  if ! command -v agy &>/dev/null && ! command -v antigravity &>/dev/null; then
+    echo "antigravity is not installed. Choose an installed agent with: omarchy default agent <name>" >&2
+    exit 1
+  fi
+
+  # Agents refuse to remember trust for $HOME, so launches start in ~/Work if present
+  [[ $PWD == "$HOME" && -d $HOME/Work ]] && cd "$HOME/Work"
+
+  # Google Antigravity launched unattended with full auto-approval
+  command=(agy --dangerously-skip-permissions)
+  [[ -n ${prompt:-} ]] && command+=(--prompt-interactive "$prompt")
+
+  if [[ $inline == "true" ]]; then
+    exec "${command[@]}"
+  else
+    exec omarchy-launch-tui --app-id=org.omarchy.agent "${command[@]}"
+  fi
+else
+  # Delegate to upstream Omarchy handler for all other agents
+  exec /usr/bin/omarchy-agent "${original_args[@]}"
+fi

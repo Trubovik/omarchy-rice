@@ -1,0 +1,23 @@
+# Security and private data excludes
+*.token*
+*.key*
+*.pem*
+*.bin
+*.db*
+*.sqlite*
+*.log
+*.bak*
+*.core
+__pycache__/
+accounts/
+.gemini/
+brain/
+credentials/
+secrets/
+steam/
+Steam/
+discord/
+telegram/
+google-chrome/
+session*
+cookie*

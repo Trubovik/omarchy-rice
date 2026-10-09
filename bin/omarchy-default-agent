@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# omarchy:summary=Set and launch the default coding agent (user wrapper with Google Antigravity support)
+# omarchy:args=[antigravity|pi|omp|opencode|claude|codex|grok|gemini|openclaw|hermes|copilot|crush|cursor-agent|muse]
+
+installing=false
+if [[ ${1:-} == "--install" ]]; then
+  installing=true
+  shift
+fi
+
+agent_file="$HOME/.config/omarchy/defaults/agent"
+
+# If no arguments provided, delegate directly to stock reader
+if (($# == 0)); then
+  exec /usr/bin/omarchy-default-agent
+fi
+
+case "$1" in
+antigravity | agy)
+  agent="antigravity"
+  name="Google Antigravity"
+  ;;
+*)
+  # Delegate all other agents directly to the upstream Omarchy handler
+  if [[ $installing == "true" ]]; then
+    exec /usr/bin/omarchy-default-agent --install "$@"
+  else
+    exec /usr/bin/omarchy-default-agent "$@"
+  fi
+  ;;
+esac
+
+# Check if agy/antigravity binary is present
+if ! command -v agy &>/dev/null && ! command -v antigravity &>/dev/null; then
+  echo "Google Antigravity CLI (agy) is not installed." >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$agent_file")"
+printf '%s\n' "$agent" >"$agent_file"
+
+if [[ $installing == "true" ]]; then
+  printf '\033[2J\033[3J\033[H'
+  exec "$HOME/.local/bin/omarchy-agent" --inline
+else
+  exec "$HOME/.local/bin/omarchy-agent"
+fi

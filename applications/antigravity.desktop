@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Google Antigravity
+GenericName=AI Coding Assistant
+Comment=AI agent powered by Google Antigravity
+Exec=omarchy-launch-tui --app-id=org.omarchy.agent agy --dangerously-skip-permissions
+Icon=google-chrome
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+Keywords=agy;antigravity;ai;agent;

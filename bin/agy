@@ -1,0 +1,49 @@
+#!/bin/bash
+# Wrapper script to ensure Google Antigravity (agy) always starts with --dangerously-skip-permissions
+
+REAL_AGY="$HOME/.local/bin/agy.bin"
+
+if [[ ! -x "$REAL_AGY" ]]; then
+  echo "Error: $REAL_AGY not found or not executable" >&2
+  exit 1
+fi
+
+# Allow explicitly disabling skip permissions via AGY_NO_SKIP_PERMISSIONS=1
+if [[ "${AGY_NO_SKIP_PERMISSIONS:-0}" == "1" ]]; then
+  exec "$REAL_AGY" "$@"
+fi
+
+# Check if flag is already passed to avoid duplicates
+has_flag=false
+for arg in "$@"; do
+  if [[ "$arg" == "--dangerously-skip-permissions" ]]; then
+    has_flag=true
+    break
+  fi
+done
+
+has_model=false
+for arg in "$@"; do
+  if [[ "$arg" == "--model" ]]; then
+    has_model=true
+    break
+  fi
+done
+
+cmd=("$REAL_AGY")
+if [[ "$has_flag" != "true" ]]; then
+  cmd+=(--dangerously-skip-permissions)
+fi
+if [[ "$has_model" != "true" ]]; then
+  cmd+=(--model gemini-3.8-flash-medium)
+fi
+
+# Run agy and sync tokens back on session completion
+"${cmd[@]}" "$@"
+ret=$?
+
+if [[ -f "$HOME/.local/bin/agy_accounts_backend.py" ]]; then
+  python3 -c "import sys; sys.path.insert(0, '$HOME/.local/bin'); import agy_accounts_backend as b; b.handle_session_exit($ret)" &>/dev/null &
+fi
+
+exit $ret
