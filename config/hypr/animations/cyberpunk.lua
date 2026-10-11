@@ -1,0 +1,13 @@
+-- Preset: Cyberpunk (Слайд-переходы и глитч-динамика)
+hl.curve("cyber", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.05 } } })
+hl.curve("sharp", { type = "bezier", points = { { 0.4, 0 }, { 0.2, 1 } } })
+
+hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
+hl.animation({ leaf = "windows", enabled = true, speed = 3.8, bezier = "cyber" })
+hl.animation({ leaf = "windowsIn", enabled = true, speed = 3.5, bezier = "cyber", style = "slide" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 2.8, bezier = "sharp", style = "slide" })
+hl.animation({ leaf = "border", enabled = true, speed = 4.5, bezier = "cyber" })
+hl.animation({ leaf = "fade", enabled = true, speed = 2.5, bezier = "sharp" })
+hl.animation({ leaf = "layers", enabled = true, speed = 3.5, bezier = "cyber" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 4.2, bezier = "cyber", style = "slidevert" })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 3.2, bezier = "sharp", style = "slide" })

@@ -18,3 +18,10 @@ source "$OMARCHY_PATH/default/bash/rc"
 export PATH="/home/trubovik/.local/bin:$PATH"
 alias agy='agy --dangerously-skip-permissions'
 alias antigravity='agy --dangerously-skip-permissions'
+
+# Terminal startup sound & Fastfetch with Subaru
+if [[ $- == *i* && -z "$TERMINAL_STARTUP_DONE" && "$TERM" != "dumb" && -z "$AGY_RUNNING" ]]; then
+  export TERMINAL_STARTUP_DONE=1
+  (pw-play ~/.config/fastfetch/terminal_sfx.ogg >/dev/null 2>&1 &)
+  fastfetch
+fi

@@ -27,13 +27,25 @@ rsync -av --exclude="*.bak*" --exclude="*.core" "$HOME/.config/hypr/" "$CONFIG_D
 # Omarchy
 if [[ -d "$HOME/.config/omarchy" ]]; then
   mkdir -p "$CONFIG_DIR/omarchy"
-  rsync -av --exclude="*.log" "$HOME/.config/omarchy/" "$CONFIG_DIR/omarchy/"
+  rsync -av --exclude="*.log" --exclude=".git" --exclude="themes" "$HOME/.config/omarchy/" "$CONFIG_DIR/omarchy/"
 fi
 
 # VoxType
 if [[ -d "$HOME/.config/voxtype" ]]; then
   mkdir -p "$CONFIG_DIR/voxtype"
   rsync -av "$HOME/.config/voxtype/" "$CONFIG_DIR/voxtype/"
+fi
+
+# Serpantinum
+if [[ -d "$HOME/.config/serpantinum" ]]; then
+  mkdir -p "$CONFIG_DIR/serpantinum"
+  rsync -av "$HOME/.config/serpantinum/" "$CONFIG_DIR/serpantinum/"
+fi
+
+# Serpantinum Widgets Layout
+if [[ -d "$HOME/.local/state/serpantinum/widgets" ]]; then
+  mkdir -p "$DOTFILES_DIR/state/serpantinum/widgets"
+  rsync -av "$HOME/.local/state/serpantinum/widgets/" "$DOTFILES_DIR/state/serpantinum/widgets/"
 fi
 
 # Терминалы

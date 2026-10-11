@@ -1,0 +1,78 @@
+{
+  "general": {
+    "language": "ru",
+    "quickactions": false,
+    "location": {
+      "ip": "176.11.8.230",
+      "latitude": 59.91275,
+      "longitude": 10.74609,
+      "city": "Oslo",
+      "region": "Oslo",
+      "region_code": "3",
+      "country_name": "Norway",
+      "country_code": "NO",
+      "postal": "0304",
+      "timezone": "Europe/Oslo",
+      "utc_offset": "+0200",
+      "currency": "NOK",
+      "languages": "no,nb,nn,se,fi",
+      "asn": "AS25400",
+      "org": "Telia Norge AS",
+      "source": "ipapi.co",
+      "updated_at": 1791723252
+    }
+  },
+  "bar": {
+    "style": "modular",
+    "distinctPills": true,
+    "position": "top",
+    "autohide": false,
+    "opacity": 90,
+    "modules": {
+      "left": [
+        "left",
+        "workspaces",
+        "focus"
+      ],
+      "center": [
+        [
+          "timedate",
+          "weather"
+        ],
+        "media",
+        "vis"
+      ],
+      "right": [
+        "sysmon",
+        "tray",
+        [
+          "kb",
+          "wifi",
+          "bt",
+          "vol",
+          "bat"
+        ]
+      ]
+    },
+    "workspacesStyle": "pills",
+    "timeStyle": "classic",
+    "sysmonStyle": "wave",
+    "sysmonStats": [
+      "cpu",
+      "ram",
+      "temp"
+    ]
+  },
+  "notifications": {
+    "dnd": false,
+    "soundFile": "/home/trubovik/.local/share/serpantinum/src/assets/sounds/notifications/Botanica.wav"
+  },
+  "display": {
+    "monitors": {
+      "eDP-2": {
+        "enabled": false
+      }
+    }
+  }
+}
+

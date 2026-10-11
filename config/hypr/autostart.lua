@@ -1,5 +1,5 @@
--- Extra autostart processes.
--- o.launch_on_start("my-service")
+-- Extra autostart processes (Serpantinum Shell).
+hl.exec_cmd("serpantinumd start")
 
 -- Fix AMD + NVIDIA hybrid GPU video decoding on Wayland:
 -- Omarchy exports LIBVA_DRIVER_NAME=nvidia globally, which breaks

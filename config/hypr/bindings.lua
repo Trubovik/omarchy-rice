@@ -29,10 +29,14 @@ hl.unbind("SUPER + B")
 -- Launch Google Chrome with clean Wayland/GPU environment
 o.bind("SUPER + B", "Google Chrome", { launch = "google-chrome-stable" })
 
--- Logitech MX Keys examples:
--- o.bind("SUPER + SHIFT + S", nil, "omarchy-capture-screenshot")
--- o.bind("SUPER + H", nil, "voxtype record toggle")
--- o.bind("SUPER + PERIOD", nil, "omarchy-shell shell toggle omarchy.emojis")
+-- Serpantinum Shell toggles (@ilyamiro.dev)
+o.bind("SUPER + period", "Right Sidebar (Control Center, Todo, Pomodoro, Mixer)", "serpantinum msg toggle system")
+o.bind("SUPER + comma", "Left Sidebar (AI Chat, Translator, Notifications)", "serpantinum msg toggle notifications")
+o.bind("SUPER + M", "Music Player", "serpantinum msg toggle music")
+o.bind("SUPER + N", "Network & Bluetooth", "serpantinum msg toggle network")
+o.bind("SUPER + ALT + V", "Audio & Volume", "serpantinum msg toggle volume")
+o.bind("SUPER + W", "Widgets Editor", "serpantinum ipc call redactor toggle")
+
 
 -- Ensure user local bin is prioritized for keybindings and dispatchers
 local local_bin = (os.getenv("HOME") or "/home/trubovik") .. "/.local/bin"

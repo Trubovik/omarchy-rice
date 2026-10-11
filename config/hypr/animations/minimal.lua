@@ -1,0 +1,13 @@
+-- Preset: Minimal (Чистые легкие затухания без сдвигов)
+hl.curve("almostLinear", { type = "bezier", points = { { 0.5, 0.5 }, { 0.75, 1.0 } } })
+hl.curve("quick", { type = "bezier", points = { { 0.15, 0 }, { 0.1, 1 } } })
+
+hl.animation({ leaf = "global", enabled = true, speed = 10, bezier = "default" })
+hl.animation({ leaf = "windows", enabled = true, speed = 3.0, bezier = "quick" })
+hl.animation({ leaf = "windowsIn", enabled = true, speed = 2.8, bezier = "quick", style = "fade" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 2.0, bezier = "almostLinear", style = "fade" })
+hl.animation({ leaf = "border", enabled = true, speed = 3.5, bezier = "almostLinear" })
+hl.animation({ leaf = "fade", enabled = true, speed = 2.5, bezier = "quick" })
+hl.animation({ leaf = "layers", enabled = true, speed = 2.8, bezier = "quick", style = "fade" })
+hl.animation({ leaf = "workspaces", enabled = false })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 2.5, bezier = "quick", style = "fade" })

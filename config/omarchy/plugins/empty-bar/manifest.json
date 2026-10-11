@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "empty-bar",
+  "name": "Empty Bar",
+  "version": "1.0.0",
+  "author": "Antigravity",
+  "description": "Invisible Bar",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  }
+}

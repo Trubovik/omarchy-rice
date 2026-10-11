@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "pill-bar",
+  "name": "Pill Bar",
+  "version": "1.0.0",
+  "author": "Antigravity",
+  "description": "Floating Pill Capsules Bar",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  }
+}

@@ -28,6 +28,13 @@ if [[ -d "$DOTFILES_DIR/config" ]]; then
   cp -r "$DOTFILES_DIR/config/"* "$HOME/.config/"
 fi
 
+# Восстановление состояния виджетов
+if [[ -d "$DOTFILES_DIR/state/serpantinum/widgets" ]]; then
+  echo "==> 3.1 Восстановление виджетов Serpantinum..."
+  mkdir -p "$HOME/.local/state/serpantinum/widgets"
+  cp -r "$DOTFILES_DIR/state/serpantinum/widgets/"* "$HOME/.local/state/serpantinum/widgets/"
+fi
+
 # 3. Восстановление скриптов в ~/.local/bin
 echo "==> 4. Восстановление скриптов в ~/.local/bin/..."
 mkdir -p "$HOME/.local/bin"
