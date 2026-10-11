@@ -30,6 +30,7 @@
     "opacity": 90,
     "modules": {
       "left": [
+        "left",
         "workspaces"
       ],
       "center": [

@@ -31,9 +31,9 @@ Item {
 
         IconButton {
             id: launcherButton
-            height: leftLayout.pillHeight
-            width: barWindow ? barWindow.s(root.isCompact ? 30 : 32) : (root.isCompact ? 30 : 32)
-            visible: true
+            height: 0
+            width: 0
+            visible: false
             iconOffsetX: 0
 
             cornerRadius: height / 2
