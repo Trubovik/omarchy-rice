@@ -42,12 +42,20 @@ Scope {
 
                 implicitWidth: 6
 
+                Timer {
+                    id: leftTriggerTimer
+                    interval: 180
+                    repeat: false
+                    onTriggered: {
+                        Quickshell.execDetached(["bash", "-c", "serpantinum msg open notifications"]);
+                    }
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
-                    onEntered: {
-                        Quickshell.execDetached(["bash", "-c", "serpantinum msg open notifications"]);
-                    }
+                    onEntered: leftTriggerTimer.restart()
+                    onExited: leftTriggerTimer.stop()
                 }
             }
 
@@ -68,12 +76,20 @@ Scope {
 
                 implicitWidth: 6
 
+                Timer {
+                    id: rightTriggerTimer
+                    interval: 180
+                    repeat: false
+                    onTriggered: {
+                        Quickshell.execDetached(["bash", "-c", "serpantinum msg open system"]);
+                    }
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     hoverEnabled: true
-                    onEntered: {
-                        Quickshell.execDetached(["bash", "-c", "serpantinum msg open system"]);
-                    }
+                    onEntered: rightTriggerTimer.restart()
+                    onExited: rightTriggerTimer.stop()
                 }
             }
         }

@@ -633,6 +633,50 @@ PanelWindow {
     }
 
     function switchWidget(newWidget, arg) {
+        if (newWidget === "hidden") {
+            masterWindow.targetActive = "hidden";
+
+            if (currentActive === "hidden" && !masterWindow.isVisible && !masterWindow.isClosing) {
+                return;
+            }
+
+            if (masterWindow.isClosing) {
+                if (!exitSafetyTimer.running) exitSafetyTimer.restart();
+                return;
+            }
+
+            masterWindow.switchGeneration++;
+            masterWindow.isClosing = true;
+
+            let activeItem = widgetCache[currentActive] || widgetStack.currentItem;
+
+            let finalizeClose = function() {
+                if (masterWindow.targetActive === "hidden") {
+                    exitSafetyTimer.stop();
+                    masterWindow.isClosing = false;
+                    masterWindow.currentActive = "hidden";
+                    masterWindow.morphDuration = masterWindow.exitDuration;
+                    masterWindow.disableMorph = true;
+                    masterWindow.isVisible = false;
+
+                    for (let k in widgetCache) {
+                        let it = widgetCache[k];
+                        if (it) it.visible = false;
+                    }
+                    reportWidgetState();
+                }
+            };
+
+            exitSafetyTimer.restart();
+
+            if (activeItem && typeof activeItem.startExit === "function") {
+                activeItem.startExit(finalizeClose);
+            } else {
+                finalizeClose();
+            }
+            return;
+        }
+
         masterWindow.switchGeneration++;
         let gen = masterWindow.switchGeneration;
         masterWindow.targetActive = newWidget;
@@ -648,45 +692,12 @@ PanelWindow {
             exitSafetyTimer.stop();
         }
 
-        if (newWidget === "hidden") {
-            if (currentActive !== "hidden" && !masterWindow.isClosing) {
-                let closingGen = gen;
-                masterWindow.isClosing = true;
-                masterWindow.targetActive = "hidden";
-
-                let activeItem = widgetCache[currentActive] || widgetStack.currentItem;
-
-                let finalizeClose = function() {
-                    if (closingGen !== masterWindow.switchGeneration) return;
-                    masterWindow.isClosing = false;
-                    masterWindow.currentActive = "hidden";
-                    masterWindow.morphDuration = masterWindow.exitDuration;
-                    masterWindow.disableMorph = true;
-                    masterWindow.isVisible = false;
-
-                    for (let k in widgetCache) {
-                        let it = widgetCache[k];
-                        if (it) it.visible = false;
-                    }
-                    reportWidgetState();
-                };
-
-                if (activeItem && typeof activeItem.startExit === "function") {
-                    exitSafetyTimer.scheduledGeneration = closingGen;
-                    exitSafetyTimer.restart();
-                    activeItem.startExit(finalizeClose);
-                } else {
-                    finalizeClose();
-                }
-            }
-        } else {
-            masterWindow.isClosing = false;
-            let targetScreen = resolveTargetScreen();
-            if (targetScreen && masterWindow.screen !== targetScreen) {
-                masterWindow.screen = targetScreen;
-            }
-            executeSwitch(newWidget, arg, gen);
+        masterWindow.isClosing = false;
+        let targetScreen = resolveTargetScreen();
+        if (targetScreen && masterWindow.screen !== targetScreen) {
+            masterWindow.screen = targetScreen;
         }
+        executeSwitch(newWidget, arg, gen);
     }
 
     function executeSwitch(newWidget, arg, gen) {
@@ -778,10 +789,10 @@ PanelWindow {
 
     Timer {
         id: exitSafetyTimer
-        interval: 450
-        property int scheduledGeneration: -1
+        interval: 320
+        repeat: false
         onTriggered: {
-            if (scheduledGeneration === masterWindow.switchGeneration && masterWindow.isClosing) {
+            if (masterWindow.targetActive === "hidden" && (masterWindow.isClosing || masterWindow.isVisible)) {
                 masterWindow.isClosing = false;
                 masterWindow.currentActive = "hidden";
                 masterWindow.morphDuration = masterWindow.exitDuration;
