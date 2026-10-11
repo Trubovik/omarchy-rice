@@ -48,6 +48,12 @@ if [[ -d "$HOME/.local/state/serpantinum/widgets" ]]; then
   rsync -av "$HOME/.local/state/serpantinum/widgets/" "$DOTFILES_DIR/state/serpantinum/widgets/"
 fi
 
+# Serpantinum Core & Tweaks
+if [[ -d "$HOME/.local/share/serpantinum/src" ]]; then
+  mkdir -p "$DOTFILES_DIR/local_share/serpantinum/src"
+  rsync -av --exclude="*.cache*" "$HOME/.local/share/serpantinum/src/" "$DOTFILES_DIR/local_share/serpantinum/src/"
+fi
+
 # Терминалы
 for term in foot alacritty kitty ghostty; do
   if [[ -d "$HOME/.config/$term" ]]; then
