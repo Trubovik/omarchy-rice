@@ -30,12 +30,13 @@ hl.unbind("SUPER + B")
 o.bind("SUPER + B", "Google Chrome", { launch = "google-chrome-stable" })
 
 -- Serpantinum Shell toggles (@ilyamiro.dev)
+o.bind("SUPER + bracketright", "Right Sidebar (Control Center, Todo, Pomodoro, Mixer)", "serpantinum msg toggle system")
 o.bind("SUPER + period", "Right Sidebar (Control Center, Todo, Pomodoro, Mixer)", "serpantinum msg toggle system")
-o.bind("SUPER + comma", "Left Sidebar (AI Chat, Translator, Notifications)", "serpantinum msg toggle notifications")
+o.bind("SUPER + bracketleft", "Left Sidebar (AI Chat, Translator, Notifications)", "serpantinum msg toggle notifications")
 o.bind("SUPER + M", "Music Player", "serpantinum msg toggle music")
 o.bind("SUPER + N", "Network & Bluetooth", "serpantinum msg toggle network")
 o.bind("SUPER + ALT + V", "Audio & Volume", "serpantinum msg toggle volume")
-o.bind("SUPER + W", "Widgets Editor", "serpantinum ipc call redactor toggle")
+o.bind("SUPER + ALT + W", "Widgets Editor", "serpantinum ipc call redactor toggle")
 
 
 -- Ensure user local bin is prioritized for keybindings and dispatchers
@@ -50,6 +51,7 @@ hl.unbind("SUPER + SHIFT + CTRL + A")
 o.bind("SUPER + SHIFT + CTRL + A", "Agent", local_bin .. "/omarchy-agent --pick")
 o.bind("SUPER + A", "Antigravity Agent", local_bin .. "/omarchy-agent")
 o.bind("SUPER + ALT + A", "Rotate Antigravity Account", local_bin .. "/agy-account next")
+hl.unbind("SUPER + CTRL + A")
 o.bind("SUPER + CTRL + A", "Antigravity Accounts Dashboard", local_bin .. "/agy-accounts-gui")
 
 -- Logitech G502: Button G4 (mouse:275) -> Push-to-talk voice dictation
