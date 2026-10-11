@@ -65,7 +65,7 @@ done
 echo "==> 3. Бэкап системных пользовательских скриптов (~/.local/bin)..."
 # Копируем только кастомные скрипты и утилиты, игнорируя бинарники > 50MB (например, agy.bin) и pycache
 mkdir -p "$BIN_DIR"
-for script in agy agy-account agy-accounts-gui agy_accounts_backend.py omarchy omarchy-agent omarchy-default-agent; do
+for script in agy agy-account agy-accounts-gui agy_accounts_backend.py omarchy omarchy-agent omarchy-default-agent hypr-anim-gui; do
   if [[ -f "$HOME/.local/bin/$script" ]]; then
     cp "$HOME/.local/bin/$script" "$BIN_DIR/"
   fi
@@ -73,7 +73,7 @@ done
 
 echo "==> 4. Бэкап .desktop ярлыков..."
 mkdir -p "$APP_DIR"
-for app in antigravity.desktop antigravity-accounts.desktop antigravity-add-account.desktop; do
+for app in antigravity.desktop antigravity-accounts.desktop antigravity-add-account.desktop hypr-anim-gui.desktop; do
   if [[ -f "$HOME/.local/share/applications/$app" ]]; then
     cp "$HOME/.local/share/applications/$app" "$APP_DIR/"
   fi

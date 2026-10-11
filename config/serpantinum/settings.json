@@ -72,6 +72,11 @@
         "enabled": false
       }
     }
+  },
+  "idle": {
+    "manualInhibit": false,
+    "caffeineStartTime": 0,
+    "caffeineEndTime": 0
   }
 }
 

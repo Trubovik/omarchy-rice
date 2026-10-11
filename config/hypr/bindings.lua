@@ -56,6 +56,7 @@ o.bind("SUPER + A", "Antigravity Agent", local_bin .. "/omarchy-agent")
 o.bind("SUPER + ALT + A", "Rotate Antigravity Account", local_bin .. "/agy-account next")
 hl.unbind("SUPER + CTRL + A")
 o.bind("SUPER + CTRL + A", "Antigravity Accounts Dashboard", local_bin .. "/agy-accounts-gui")
+o.bind("SUPER + ALT + Y", "Animation Studio (Hyprland)", local_bin .. "/hypr-anim-gui")
 
 -- Logitech G502: Button G4 (mouse:275) -> Push-to-talk voice dictation
 o.bind("mouse:275", "Start dictation (G4 push-to-talk)", "voxtype record start")

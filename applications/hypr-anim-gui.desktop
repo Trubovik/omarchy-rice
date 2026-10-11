@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Animation Studio
+Name[ru]=Студия анимаций Hyprland
+Comment=Interactive Animation Presets and Sandbox for Hyprland
+Comment[ru]=Интерактивный просмотр и переключение анимаций Hyprland
+Exec=/home/trubovik/.local/bin/hypr-anim-gui
+Icon=preferences-desktop-theme
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;
+Keywords=animation;hyprland;bouncy;smooth;snappy;

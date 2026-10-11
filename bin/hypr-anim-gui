@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+import os
+import sys
+import subprocess
+import gi
+
+gi.require_version('Gtk', '4.0')
+gi.require_version('Adw', '1')
+from gi.repository import Gtk, Adw, GLib, Gio
+
+ANIM_DIR = os.path.expanduser("~/.config/hypr/animations")
+CURRENT_FILE = os.path.join(ANIM_DIR, "current.lua")
+
+PRESET_META = {
+    "bouncy": {
+        "title": "Bouncy",
+        "icon": "emblem-favorite-symbolic",
+        "badge": "Пружинящий отскок",
+        "desc": "Живые упругие анимации с овершотом и пружинящим приземлением окон."
+    },
+    "smooth": {
+        "title": "Smooth",
+        "icon": "weather-few-clouds-symbolic",
+        "badge": "Шелковистая кинематографичность",
+        "desc": "Мягкие плавные кривые Безье без резких ускорений для спокойной работы."
+    },
+    "snappy": {
+        "title": "Snappy",
+        "icon": "media-flash-symbolic",
+        "badge": "Молниеносный отклик",
+        "desc": "Сверхбыстрые и отзывчивые переходы для максимальной скорости и киберспорта."
+    },
+    "cyberpunk": {
+        "title": "Cyberpunk",
+        "icon": "applications-games-symbolic",
+        "badge": "Слайды и глитч-динамика",
+        "desc": "Резкие динамичные сдвиги с эффектом слайда и резким торможением."
+    },
+    "minimal": {
+        "title": "Minimal",
+        "icon": "view-conceal-symbolic",
+        "badge": "Лёгкий Fade без рывков",
+        "desc": "Аскетичные затухания прозрачности без масштабирования и сдвигов."
+    },
+    "default": {
+        "title": "Default",
+        "icon": "preferences-system-symbolic",
+        "badge": "Стандарт Omarchy",
+        "desc": "Сбалансированный заводской профиль анимаций окружения."
+    }
+}
+
+class TestDialog(Adw.Window):
+    def __init__(self, parent):
+        super().__init__()
+        self.set_title("Тестовое окно")
+        self.set_default_size(420, 260)
+        self.set_transient_for(parent)
+        self.set_modal(True)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        box.set_margin_top(24)
+        box.set_margin_bottom(24)
+        box.set_margin_start(24)
+        box.set_margin_end(24)
+        box.set_valign(Gtk.Align.CENTER)
+
+        icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+        icon.set_pixel_size(48)
+        box.append(icon)
+
+        title = Gtk.Label(label="Тест анимаций окна")
+        title.add_css_class("title-2")
+        box.append(title)
+
+        desc = Gtk.Label(label="Окно использует текущие кривые Безье Hyprland.\nЗакроется автоматически через 2.5 сек.")
+        desc.add_css_class("dim-label")
+        desc.set_justify(Gtk.Justification.CENTER)
+        box.append(desc)
+
+        close_btn = Gtk.Button(label="Закрыть сейчас")
+        close_btn.add_css_class("suggested-action")
+        close_btn.connect("clicked", lambda b: self.close())
+        box.append(close_btn)
+
+        self.set_content(box)
+        GLib.timeout_add(2500, self.auto_close)
+
+    def auto_close(self):
+        if self.is_visible():
+            self.close()
+        return False
+
+class AnimationWindow(Adw.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app)
+        self.set_title("Hyprland Animation Studio")
+        self.set_default_size(720, 680)
+
+        self.cards = {}
+        self.current_preset = self.detect_current_preset()
+
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+
+        # Header bar
+        header = Adw.HeaderBar()
+        title_widget = Adw.WindowTitle(title="Animation Studio", subtitle="Пресеты анимаций Hyprland")
+        header.set_title_widget(title_widget)
+        main_box.append(header)
+
+        # Toast overlay for notifications
+        self.toast_overlay = Adw.ToastOverlay()
+        main_box.append(self.toast_overlay)
+
+        # Content scrolled window
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        self.toast_overlay.set_child(scrolled)
+
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(680)
+        clamp.set_tightening_threshold(540)
+        scrolled.set_child(clamp)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        content.set_margin_top(20)
+        content.set_margin_bottom(24)
+        content.set_margin_start(16)
+        content.set_margin_end(16)
+        clamp.set_child(content)
+
+        # Interactive Test Sandbox Group
+        test_group = Adw.PreferencesGroup()
+        test_group.set_title("Интерактивный тест-драйв")
+        test_group.set_description("Поклацайте кнопки ниже, чтобы вживую оценить физику текущей анимации")
+
+        test_row = Adw.ActionRow()
+        test_row.set_title("Проверка анимаций окон и воркспейсов")
+        test_row.set_subtitle("Тестовое окно открывается с эффектом pop-in / bounce")
+
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_box.set_valign(Gtk.Align.CENTER)
+
+        test_win_btn = Gtk.Button(label="Всплывающее окно")
+        test_win_btn.set_icon_name("window-new-symbolic")
+        test_win_btn.add_css_class("accent")
+        test_win_btn.connect("clicked", self.on_test_window_clicked)
+        btn_box.append(test_win_btn)
+
+        test_ws_btn = Gtk.Button(label="Смена воркспейса")
+        test_ws_btn.set_icon_name("view-paged-symbolic")
+        test_ws_btn.connect("clicked", self.on_test_workspace_clicked)
+        btn_box.append(test_ws_btn)
+
+        test_row.add_suffix(btn_box)
+        test_group.add(test_row)
+        content.append(test_group)
+
+        # Presets Group
+        presets_group = Adw.PreferencesGroup()
+        presets_group.set_title("Коллекция стилей анимаций")
+        presets_group.set_description("Выберите желаемый стиль — он применится моментально на лету")
+
+        available = self.list_available_presets()
+        for preset in available:
+            row = self.create_preset_row(preset)
+            presets_group.add(row)
+
+        content.append(presets_group)
+
+        self.set_content(main_box)
+
+    def detect_current_preset(self):
+        if not os.path.exists(CURRENT_FILE):
+            return "default"
+        try:
+            with open(CURRENT_FILE, "r") as f:
+                content = f.read()
+            for p in self.list_available_presets():
+                p_file = os.path.join(ANIM_DIR, f"{p}.lua")
+                if os.path.exists(p_file):
+                    with open(p_file, "r") as pf:
+                        if pf.read().strip() == content.strip():
+                            return p
+        except Exception:
+            pass
+        return "bouncy"
+
+    def list_available_presets(self):
+        if not os.path.isdir(ANIM_DIR):
+            return list(PRESET_META.keys())
+        files = [f[:-4] for f in os.listdir(ANIM_DIR) if f.endswith(".lua") and f != "current.lua"]
+        ordered = []
+        for p in PRESET_META.keys():
+            if p in files:
+                ordered.append(p)
+        for f in files:
+            if f not in ordered:
+                ordered.append(f)
+        return ordered
+
+    def create_preset_row(self, preset):
+        meta = PRESET_META.get(preset, {
+            "title": preset.capitalize(),
+            "icon": "application-x-executable-symbolic",
+            "badge": "Кастомный профиль",
+            "desc": f"Пользовательский пресет анимаций {preset}"
+        })
+
+        row = Adw.ActionRow()
+        row.set_title(meta["title"])
+        row.set_subtitle(f"{meta['badge']} — {meta['desc']}")
+
+        prefix_icon = Gtk.Image.new_from_icon_name(meta["icon"])
+        prefix_icon.set_pixel_size(24)
+        row.add_prefix(prefix_icon)
+
+        # Status badge or button
+        action_btn = Gtk.Button()
+        action_btn.set_valign(Gtk.Align.CENTER)
+
+        is_active = (preset == self.current_preset)
+        self.update_button_state(action_btn, is_active)
+        action_btn.connect("clicked", lambda b, p=preset: self.apply_preset(p))
+
+        row.add_suffix(action_btn)
+        row.set_activatable_widget(action_btn)
+
+        self.cards[preset] = {
+            "row": row,
+            "button": action_btn
+        }
+        return row
+
+    def update_button_state(self, btn, is_active):
+        if is_active:
+            btn.set_label("Активен ✓")
+            btn.remove_css_class("suggested-action")
+            btn.add_css_class("success")
+        else:
+            btn.set_label("Применить")
+            btn.remove_css_class("success")
+            btn.add_css_class("suggested-action")
+
+    def apply_preset(self, preset):
+        target = os.path.join(ANIM_DIR, f"{preset}.lua")
+        if not os.path.exists(target):
+            toast = Adw.Toast.new(f"Ошибка: пресет {preset} не найден")
+            self.toast_overlay.add_toast(toast)
+            return
+
+        try:
+            with open(target, "r") as sf, open(CURRENT_FILE, "w") as df:
+                df.write(sf.read())
+
+            subprocess.run(["hyprctl", "reload"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.current_preset = preset
+
+            for p, data in self.cards.items():
+                self.update_button_state(data["button"], p == preset)
+
+            toast = Adw.Toast.new(f"Пресет «{PRESET_META.get(preset, {}).get('title', preset)}» успешно применён!")
+            self.toast_overlay.add_toast(toast)
+
+        except Exception as e:
+            toast = Adw.Toast.new(f"Ошибка применения: {e}")
+            self.toast_overlay.add_toast(toast)
+
+    def on_test_window_clicked(self, btn):
+        dialog = TestDialog(self)
+        dialog.present()
+
+    def on_test_workspace_clicked(self, btn):
+        # Switch to workspace 9 and back after 400ms to preview workspace transitions
+        try:
+            curr = subprocess.check_output(["hyprctl", "activeworkspace", "-j"]).decode()
+            import json
+            curr_id = json.loads(curr).get("id", 1)
+            target_ws = 9 if curr_id != 9 else 1
+
+            subprocess.run(["hyprctl", "dispatch", "workspace", str(target_ws)], stdout=subprocess.DEVNULL)
+            GLib.timeout_add(500, lambda: subprocess.run(["hyprctl", "dispatch", "workspace", str(curr_id)], stdout=subprocess.DEVNULL))
+        except Exception as e:
+            toast = Adw.Toast.new(f"Не удалось переключить воркспейс: {e}")
+            self.toast_overlay.add_toast(toast)
+
+class AnimationApp(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="org.omarchy.hypr.animstudio")
+
+    def do_activate(self):
+        win = self.props.active_window
+        if not win:
+            # Force Dark style
+            Adw.StyleManager.get_default().set_color_scheme(Adw.ColorScheme.PREFER_DARK)
+            win = AnimationWindow(self)
+        win.present()
+
+if __name__ == "__main__":
+    app = AnimationApp()
+    sys.exit(app.run(sys.argv))
