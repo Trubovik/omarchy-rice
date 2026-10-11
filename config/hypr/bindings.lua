@@ -37,6 +37,9 @@ o.bind("SUPER + M", "Music Player", "serpantinum msg toggle music")
 o.bind("SUPER + N", "Network & Bluetooth", "serpantinum msg toggle network")
 o.bind("SUPER + ALT + V", "Audio & Volume", "serpantinum msg toggle volume")
 o.bind("SUPER + ALT + W", "Widgets Editor", "serpantinum ipc call redactor toggle")
+hl.unbind("SUPER + CTRL + SPACE")
+o.bind("SUPER + CTRL + SPACE", "Wallpaper Carousel (Serpantinum)", "serpantinum msg toggle wallpaper")
+o.bind("SUPER + ALT + P", "Wallpaper Carousel (Serpantinum)", "serpantinum msg toggle wallpaper")
 
 
 -- Ensure user local bin is prioritized for keybindings and dispatchers
