@@ -30,23 +30,17 @@
     "opacity": 90,
     "modules": {
       "left": [
-        "left",
-        "workspaces",
-        "focus"
+        "workspaces"
       ],
       "center": [
-        [
-          "timedate",
-          "weather"
-        ],
-        "media",
-        "vis"
+        "timedate",
+        "weather",
+        "media"
       ],
       "right": [
         "sysmon",
         "tray",
         [
-          "kb",
           "wifi",
           "bt",
           "vol",
@@ -61,11 +55,15 @@
       "cpu",
       "ram",
       "temp"
-    ]
+    ],
+    "groupColors": {
+      "g_kb": "#f5c2e7"
+    }
   },
   "notifications": {
     "dnd": false,
-    "soundFile": "/home/trubovik/.local/share/serpantinum/src/assets/sounds/notifications/Botanica.wav"
+    "soundFile": "/home/trubovik/.local/share/serpantinum/src/assets/sounds/notifications/Curious.mp3",
+    "sound": true
   },
   "display": {
     "monitors": {
