@@ -35,6 +35,13 @@ if [[ -d "$DOTFILES_DIR/state/serpantinum/widgets" ]]; then
   cp -r "$DOTFILES_DIR/state/serpantinum/widgets/"* "$HOME/.local/state/serpantinum/widgets/"
 fi
 
+# Восстановление кастомизаций Serpantinum
+if [[ -d "$DOTFILES_DIR/local_share/serpantinum/src" ]]; then
+  echo "==> 3.2 Восстановление кастомизаций Serpantinum..."
+  mkdir -p "$HOME/.local/share/serpantinum/src"
+  cp -r "$DOTFILES_DIR/local_share/serpantinum/src/"* "$HOME/.local/share/serpantinum/src/"
+fi
+
 # 3. Восстановление скриптов в ~/.local/bin
 echo "==> 4. Восстановление скриптов в ~/.local/bin/..."
 mkdir -p "$HOME/.local/bin"
