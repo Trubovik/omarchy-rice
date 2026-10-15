@@ -25,7 +25,8 @@ ShellRoot {
 
                 focusable: false
                 exclusionMode: ExclusionMode.Ignore
-                color: "#0a0a0f"
+                color: "transparent"
+                visible: barWindow.isVideoA || barWindow.isVideoB
 
                 anchors { top: true; bottom: true; left: true; right: true }
 
@@ -215,7 +216,7 @@ ShellRoot {
                     if (!path) return;
                     if (!force && path === barWindow.currentWallpaperPath) return;
 
-                    let cleanPath = String(path).trim();
+                    let cleanPath = String(path).trim().replace(/^file:\/\//, "");
                     let vid = barWindow.isVideo(cleanPath);
 
                     let slash = cleanPath.lastIndexOf("/");
@@ -335,7 +336,7 @@ ShellRoot {
                         DesktopMenuController.isMenuShuffle = false;
                     }
 
-                    let cleanPath = String(path).trim();
+                    let cleanPath = String(path).trim().replace(/^file:\/\//, "");
                     let slash = cleanPath.lastIndexOf("/");
                     let origName = cleanPath.substring(slash + 1);
                     let dot = cleanPath.lastIndexOf(".");

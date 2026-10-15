@@ -42,10 +42,10 @@ ShellRoot {
             monitorName: modelData.name
         }
     }
-    // Loader {
-    //     active: !performanceMode
-    //     sourceComponent: WallpaperEngine {}
-    // }
+    Loader {
+        active: !performanceMode
+        sourceComponent: WallpaperEngine {}
+    }
     Loader {
         active: !performanceMode && quickactionsEnabled
         sourceComponent: Floating {}
