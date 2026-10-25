@@ -162,6 +162,9 @@ ShellRoot {
                         barWindow.wpMonitorSnapshotPath
                     ]
                     onExited: exitCode => {
+                        if (exitCode === 0) {
+                            Quickshell.execDetached(["bash", "-c", "omarchy-theme-bg-set \"$1\"", "_", barWindow.wpSnapshotPath]);
+                        }
                         if (exitCode === 0 && typeof Matugen !== "undefined" && typeof Matugen.generate === "function") {
                             Matugen.generate(barWindow.wpSnapshotPath);
                         }

@@ -394,7 +394,11 @@ Item {
 
         if (targetFile) {
             let cleanPath = String(targetFile).replace(/^file:\/\//, "");
-            Quickshell.execDetached(["bash", "-c", "omarchy-theme-bg-set \"$1\"", "_", cleanPath]);
+            let lp = cleanPath.toLowerCase();
+            let isVid = lp.endsWith(".mp4") || lp.endsWith(".mkv") || lp.endsWith(".mov") || lp.endsWith(".webm");
+            if (!isVid) {
+                Quickshell.execDetached(["bash", "-c", "omarchy-theme-bg-set \"$1\"", "_", cleanPath]);
+            }
         }
 
         if (typeof masterWindow !== "undefined" && masterWindow.switchWidget) {

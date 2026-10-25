@@ -18,7 +18,11 @@ Item {
         root.wallpaperChanged(screenName, path, transition ? transition : "fade");
         if (path) {
             let cleanPath = String(path).replace(/^file:\/\//, "");
-            Quickshell.execDetached(["bash", "-c", "omarchy-theme-bg-set \"$1\"", "_", cleanPath]);
+            let lp = cleanPath.toLowerCase();
+            let isVid = lp.endsWith(".mp4") || lp.endsWith(".mkv") || lp.endsWith(".mov") || lp.endsWith(".webm");
+            if (!isVid) {
+                Quickshell.execDetached(["bash", "-c", "omarchy-theme-bg-set \"$1\"", "_", cleanPath]);
+            }
         }
     }
 
