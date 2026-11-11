@@ -10,6 +10,8 @@ Item {
     anchors.fill: parent
     clip: true
 
+    property bool previewMode: false
+
     property real minWidth: 90
     property real minHeight: 90
     property real maxWidth: 600
@@ -53,8 +55,14 @@ Item {
         height: root.pillLength
         radius: root.pillRadius
         rotation: 45
-        color: ThemeBackend.surface0
+        color: Qt.alpha(ThemeBackend.surface0, ThemeBackend.elementOpacity)
         antialiasing: true
+
+        WallpaperBlur {
+            z: -1
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         Item {
             anchors.fill: parent

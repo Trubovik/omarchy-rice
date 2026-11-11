@@ -72,24 +72,12 @@ PanelWindow {
     property string cachedMode: "false"
     property bool isVideoMode: false
 
-    IpcHandler {
-        target: "screenshotOverlay"
-
-        function toggle(img: string, editMode: string, audioPrefs: string, cGeom: string, cGeomVideo: string, cMode: string, cBackend: string, targetMon: string): void {
-            if (root.isActive) {
-                if (img && img !== "") Quickshell.execDetached(["bash", "-c", "rm -f " + img]);
-                root.deactivate();
-            } else {
-                root.activate(img, editMode, audioPrefs, cGeom, cGeomVideo, cMode, cBackend, targetMon);
-            }
-        }
-
-        function activate(img: string, editMode: string, audioPrefs: string, cGeom: string, cGeomVideo: string, cMode: string, cBackend: string, targetMon: string): void {
-            root.activate(img, editMode, audioPrefs, cGeom, cGeomVideo, cMode, cBackend, targetMon);
-        }
-
-        function deactivate(): void {
+    function toggleOverlay(img, editMode, audioPrefs, cGeom, cGeomVideo, cMode, cBackend, targetMon) {
+        if (root.isActive) {
+            if (img && img !== "") Quickshell.execDetached(["rm", "-f", img]);
             root.deactivate();
+        } else {
+            root.activate(img, editMode, audioPrefs, cGeom, cGeomVideo, cMode, cBackend, targetMon);
         }
     }
 
@@ -98,7 +86,7 @@ PanelWindow {
             root.grabKeyboardFocus();
             Qt.callLater(root.grabKeyboardFocus);
         } else {
-            if (root.freezeImg !== "") Quickshell.execDetached(["bash", "-c", "rm -f " + root.freezeImg]);
+            if (root.freezeImg !== "") Quickshell.execDetached(["rm", "-f", root.freezeImg]);
         }
     }
 
@@ -119,7 +107,7 @@ PanelWindow {
         onExited: (exitCode) => {
             if (exitCode === 0) {
                 if (root.freezeImg !== "" && root.freezeImg !== targetFile) {
-                    Quickshell.execDetached(["bash", "-c", "rm -f " + root.freezeImg]);
+                    Quickshell.execDetached(["rm", "-f", root.freezeImg]);
                 }
                 root.freezeImg = targetFile;
             }
@@ -197,7 +185,7 @@ PanelWindow {
         root.videoBackend = (cBackend === "wf-recorder") ? "wf-recorder" : "gpu-screen-recorder";
 
         if (root.isVideoMode) {
-            if (img && img !== "") Quickshell.execDetached(["bash", "-c", "rm -f " + img]);
+            if (img && img !== "") Quickshell.execDetached(["rm", "-f", img]);
             root.freezeImg = "";
         } else {
             root.freezeImg = img || "";
@@ -261,7 +249,7 @@ PanelWindow {
         refreezeProcess.running = false;
         root.isRefreezing = false;
         root.animateChanges = false;
-        if (root.freezeImg !== "") Quickshell.execDetached(["bash", "-c", "rm -f " + root.freezeImg]);
+        if (root.freezeImg !== "") Quickshell.execDetached(["rm", "-f", root.freezeImg]);
         root.freezeImg = "";
         root.isActive = false;
         root.showQrPopup = false;
@@ -277,7 +265,7 @@ PanelWindow {
 
     onIsVideoModeChanged: {
         if (!root.isInitialized || root.isLoading) return;
-        Quickshell.execDetached(["bash", "-c", "echo '" + (root.isVideoMode ? "true" : "false") + "' > " + Caching.getCacheDir("screenshot") + "/video_mode"]);
+        videoModeFile.setText((root.isVideoMode ? "true" : "false") + "\n");
 
         root.isMaximized = false;
         let screenW = root.screen ? root.screen.width : root.width;
@@ -290,7 +278,7 @@ PanelWindow {
             root.preEndY = root.endY;
 
             if (root.freezeImg !== "") {
-                Quickshell.execDetached(["bash", "-c", "rm -f " + root.freezeImg]);
+                Quickshell.execDetached(["rm", "-f", root.freezeImg]);
                 root.freezeImg = "";
             }
 
@@ -344,7 +332,7 @@ PanelWindow {
 
     onVideoBackendChanged: {
         if (!root.isInitialized || root.isLoading) return;
-        Quickshell.execDetached(["bash", "-c", "echo '" + root.videoBackend + "' > " + Caching.getCacheDir("screenshot") + "/video_backend"]);
+        videoBackendFile.setText(root.videoBackend + "\n");
         if (root.isVideoMode) {
             let screenW = root.screen ? root.screen.width : root.width;
             let screenH = root.screen ? root.screen.height : root.height;
@@ -372,6 +360,17 @@ PanelWindow {
     property bool micMute: false
     property string micDevice: ""
     property bool audioPrefsLoaded: false
+
+    readonly property bool liveAudioLevels: root.videoBackend === "gpu-screen-recorder"
+    readonly property PwNode deskLiveNode: Audio.defaultSink
+    readonly property PwNode micLiveNode: {
+        for (const n of Audio.inputs) {
+            if (n.name === root.micDevice) return n;
+        }
+        return Audio.defaultSource;
+    }
+    readonly property real deskLiveVol: root.deskLiveNode && root.deskLiveNode.audio ? root.deskLiveNode.audio.volume : 0
+    readonly property real micLiveVol: root.micLiveNode && root.micLiveNode.audio ? root.micLiveNode.audio.volume : 0
 
     FileView {
         id: audioPrefsFile
@@ -405,7 +404,32 @@ PanelWindow {
 
     function saveAudioPrefs() {
         let data = `${root.deskVol},${root.deskMute},${root.micVol},${root.micMute},${root.micDevice}`;
-        Quickshell.execDetached(["bash", "-c", `echo '${data}' > ${Caching.getStateDir("screenshot")}/audio_prefs`]);
+        audioPrefsWriter.setText(data + "\n");
+    }
+
+    FileView {
+        id: audioPrefsWriter
+        path: Caching.getStateDir("screenshot") + "/audio_prefs"
+    }
+
+    FileView {
+        id: videoModeFile
+        path: Caching.getCacheDir("screenshot") + "/video_mode"
+    }
+
+    FileView {
+        id: videoBackendFile
+        path: Caching.getCacheDir("screenshot") + "/video_backend"
+    }
+
+    FileView {
+        id: geometryFile
+        path: Caching.getCacheDir("screenshot") + "/geometry"
+    }
+
+    FileView {
+        id: geometryVideoFile
+        path: Caching.getCacheDir("screenshot") + "/geometry_video"
     }
 
     Connections {
@@ -428,10 +452,10 @@ PanelWindow {
     property real endX: 0
     property real endY: 0
 
-    Behavior on startX { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 350; easing.type: Easing.OutExpo } }
-    Behavior on startY { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 350; easing.type: Easing.OutExpo } }
-    Behavior on endX { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 350; easing.type: Easing.OutExpo } }
-    Behavior on endY { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 350; easing.type: Easing.OutExpo } }
+    Behavior on startX { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 400; easing.type: Easing.OutExpo } }
+    Behavior on startY { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 400; easing.type: Easing.OutExpo } }
+    Behavior on endX { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 400; easing.type: Easing.OutExpo } }
+    Behavior on endY { enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing; NumberAnimation { duration: 400; easing.type: Easing.OutExpo } }
 
     property bool hasSelection: false
     property bool isSelecting: false
@@ -466,14 +490,14 @@ PanelWindow {
                 root.vidEndX = root.selX + root.selW;
                 root.vidEndY = root.selY + root.selH;
                 root.vidHasSelection = true;
-                Quickshell.execDetached(["bash", "-c", "echo '" + data + "' > " + Caching.getCacheDir("screenshot") + "/geometry_video"]);
+                geometryVideoFile.setText(data + "\n");
             } else {
                 root.imgStartX = root.selX;
                 root.imgStartY = root.selY;
                 root.imgEndX = root.selX + root.selW;
                 root.imgEndY = root.selY + root.selH;
                 root.imgHasSelection = true;
-                Quickshell.execDetached(["bash", "-c", "echo '" + data + "' > " + Caching.getCacheDir("screenshot") + "/geometry"]);
+                geometryFile.setText(data + "\n");
             }
         }
     }
@@ -538,7 +562,7 @@ PanelWindow {
         opacity: (!root.isVideoMode && !root.isRefreezing && root.freezeImg !== "") ? 1.0 : 0.0
         Behavior on opacity {
             enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing
-            NumberAnimation { duration: 350; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
         }
         visible: opacity > 0
     }
@@ -549,7 +573,7 @@ PanelWindow {
         opacity: root.isRefreezing ? 0.0 : 1.0
         Behavior on opacity {
             enabled: root.animateChanges && !root.isSelecting && !root.isRefreezing
-            NumberAnimation { duration: 350; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: 400; easing.type: Easing.OutCubic }
         }
         visible: opacity > 0
 
@@ -590,8 +614,8 @@ PanelWindow {
             shadowBlur: root.isSelecting ? s(2.0) : s(1.4)
             shadowVerticalOffset: s(4)
             z: 5
-            Behavior on shadowOpacity { enabled: root.animateChanges && !root.isRefreezing; NumberAnimation { duration: 200 } }
-            Behavior on shadowBlur { enabled: root.animateChanges && !root.isRefreezing; NumberAnimation { duration: 200 } }
+            Behavior on shadowOpacity { enabled: root.animateChanges && !root.isRefreezing; NumberAnimation { duration: 250 } }
+            Behavior on shadowBlur { enabled: root.animateChanges && !root.isRefreezing; NumberAnimation { duration: 250 } }
             visible: opacity > 0
         }
 
@@ -768,10 +792,18 @@ PanelWindow {
 
             Rectangle {
                 anchors.fill: parent
-                color: ThemeBackend.base
-                border.color: Qt.rgba(ThemeBackend.text.r, ThemeBackend.text.g, ThemeBackend.text.b, 0.08)
-                border.width: s(1)
+                color: ThemeBackend.liquidGlass ? Qt.alpha(ThemeBackend.base, ThemeBackend.elementOpacity) : ThemeBackend.base
                 radius: ThemeBackend.borderRadius
+
+                WallpaperBlur {
+                    z: -1
+                    anchors.fill: parent
+                    surfaceEnabled: ThemeBackend.liquidGlass
+                    topLeftRadius: parent.radius
+                    topRightRadius: parent.radius
+                    bottomLeftRadius: parent.radius
+                    bottomRightRadius: parent.radius
+                }
 
                 MouseArea {
                     anchors.fill: parent
@@ -796,18 +828,26 @@ PanelWindow {
                 anchors.top: toolbar.fitsOutsideBottom ? parent.bottom : undefined
                 anchors.topMargin: toolbar.fitsOutsideBottom ? s(4) : 0
 
-                color: ThemeBackend.base
-                border.color: Qt.rgba(ThemeBackend.text.r, ThemeBackend.text.g, ThemeBackend.text.b, 0.08)
-                border.width: s(1)
+                color: ThemeBackend.liquidGlass ? Qt.alpha(ThemeBackend.base, ThemeBackend.elementOpacity) : ThemeBackend.base
                 radius: ThemeBackend.borderRadius
                 z: 50
                 opacity: showMenu ? 1.0 : 0.0
                 clip: true
 
-                Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuint } }
-                Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                Behavior on height { NumberAnimation { duration: 250; easing.type: Easing.OutQuint } }
+                Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
                 visible: opacity > 0
+
+                WallpaperBlur {
+                    z: -1
+                    anchors.fill: parent
+                    surfaceEnabled: ThemeBackend.liquidGlass
+                    topLeftRadius: parent.radius
+                    topRightRadius: parent.radius
+                    bottomLeftRadius: parent.radius
+                    bottomRightRadius: parent.radius
+                }
 
                 ListView {
                     anchors.fill: parent
@@ -819,7 +859,18 @@ PanelWindow {
                         width: ListView.view.width
                         height: s(40)
                         radius: ThemeBackend.borderRadius
-                        color: maBackendItem.containsMouse ? ThemeBackend.surface0 : "transparent"
+                        color: (backendItemGlass.active || !maBackendItem.containsMouse) ? "transparent" : ThemeBackend.surface0
+
+                        GlassFill {
+                            id: backendItemGlass
+                            anchors.fill: parent
+                            radius: parent.radius
+                            allowed: maBackendItem.containsMouse
+                            tintColor: ThemeBackend.text
+                            tintAmount: 0.14
+                            tintStrength: 1.0
+                            press: 0.25
+                        }
 
                         RowLayout {
                             anchors.fill: parent
@@ -829,7 +880,7 @@ PanelWindow {
 
                             Text {
                                 text: modelData.icon
-                                font.family: "Iosevka Nerd Font"
+                                font.family: ThemeBackend.iconFont
                                 font.pixelSize: s(15)
                                 color: root.videoBackend === modelData.id ? ThemeBackend.mauve : ThemeBackend.subtext0
                             }
@@ -887,18 +938,26 @@ PanelWindow {
                 anchors.top: toolbar.fitsOutsideBottom ? parent.bottom : undefined
                 anchors.topMargin: toolbar.fitsOutsideBottom ? s(4) : 0
 
-                color: ThemeBackend.base
-                border.color: Qt.rgba(ThemeBackend.text.r, ThemeBackend.text.g, ThemeBackend.text.b, 0.08)
-                border.width: s(1)
+                color: ThemeBackend.liquidGlass ? Qt.alpha(ThemeBackend.base, ThemeBackend.elementOpacity) : ThemeBackend.base
                 radius: ThemeBackend.borderRadius
                 z: 50
                 opacity: showMenu ? 1.0 : 0.0
                 clip: true
 
-                Behavior on height { NumberAnimation { duration: 350; easing.type: Easing.OutQuint } }
+                Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutQuint } }
                 Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
                 visible: opacity > 0
+
+                WallpaperBlur {
+                    z: -1
+                    anchors.fill: parent
+                    surfaceEnabled: ThemeBackend.liquidGlass
+                    topLeftRadius: parent.radius
+                    topRightRadius: parent.radius
+                    bottomLeftRadius: parent.radius
+                    bottomRightRadius: parent.radius
+                }
 
                 Text {
                     visible: Audio.inputs.length === 0
@@ -919,7 +978,18 @@ PanelWindow {
                         width: ListView.view.width
                         height: micDropdown.itemHeight
                         radius: ThemeBackend.borderRadius
-                        color: maList.containsMouse ? ThemeBackend.surface0 : "transparent"
+                        color: (micItemGlass.active || !maList.containsMouse) ? "transparent" : ThemeBackend.surface0
+
+                        GlassFill {
+                            id: micItemGlass
+                            anchors.fill: parent
+                            radius: parent.radius
+                            allowed: maList.containsMouse
+                            tintColor: ThemeBackend.text
+                            tintAmount: 0.14
+                            tintStrength: 1.0
+                            press: 0.25
+                        }
 
                         RowLayout {
                             anchors.fill: parent
@@ -929,7 +999,7 @@ PanelWindow {
 
                             Text {
                                 text: "󰍬"
-                                font.family: "Iosevka Nerd Font"
+                                font.family: ThemeBackend.iconFont
                                 font.pixelSize: s(15)
                                 color: root.micDevice === modelData.name ? ThemeBackend.mauve : ThemeBackend.subtext0
                             }
@@ -982,6 +1052,9 @@ PanelWindow {
                 property bool mutedValue: false
                 property bool hasDropdown: false
                 property bool sliderOpen: false
+                property bool readOnly: false
+                property real liveVolume: 0
+                readonly property real displayVolume: audioCtrl.readOnly ? audioCtrl.liveVolume : audioCtrl.volumeValue
 
                 signal volumeUpdate(real newVol)
                 signal muteUpdate(bool newMute)
@@ -1041,7 +1114,8 @@ PanelWindow {
                             height: s(18)
                             from: 0.0
                             to: 100.0
-                            value: Math.round(audioCtrl.volumeValue * 100)
+                            value: Math.round(audioCtrl.displayVolume * 100)
+                            enabled: !audioCtrl.readOnly
                             stepSize: 1.0
                             backgroundColor: ThemeBackend.surface1
                             accentColor: audioCtrl.mutedValue ? ThemeBackend.surface2 : ThemeBackend.mauve
@@ -1057,8 +1131,8 @@ PanelWindow {
 
                             Connections {
                                 target: audioCtrl
-                                function onVolumeValueChanged() {
-                                    volSlider.value = Math.round(audioCtrl.volumeValue * 100);
+                                function onDisplayVolumeChanged() {
+                                    volSlider.value = Math.round(audioCtrl.displayVolume * 100);
                                 }
                             }
 
@@ -1129,9 +1203,17 @@ PanelWindow {
                         width: s(136)
                         height: s(36)
                         radius: ThemeBackend.borderRadius
-                        color: backendDropdown.showMenu ? ThemeBackend.surface1 : (backendMa.containsMouse ? ThemeBackend.surface1 : ThemeBackend.surface0)
-                        border.color: Qt.rgba(ThemeBackend.text.r, ThemeBackend.text.g, ThemeBackend.text.b, 0.08)
-                        border.width: s(1)
+                        color: backendBtnGlass.active ? "transparent" : (backendDropdown.showMenu ? ThemeBackend.surface1 : (backendMa.containsMouse ? ThemeBackend.surface1 : ThemeBackend.surface0))
+
+                        GlassFill {
+                            id: backendBtnGlass
+                            anchors.fill: parent
+                            radius: parent.radius
+                            tintColor: ThemeBackend.surface1
+                            tintAmount: 0.3
+                            shadow: 1
+                            press: backendDropdown.showMenu ? 0.6 : (backendMa.containsMouse ? 0.25 : 0)
+                        }
 
                         RowLayout {
                             anchors.fill: parent
@@ -1141,7 +1223,7 @@ PanelWindow {
 
                             Text {
                                 text: root.videoBackend === "wf-recorder" ? "󰕧" : "󰢮"
-                                font.family: "Iosevka Nerd Font"
+                                font.family: ThemeBackend.iconFont
                                 font.pixelSize: s(15)
                                 color: ThemeBackend.mauve
                                 verticalAlignment: Text.AlignVCenter
@@ -1160,7 +1242,7 @@ PanelWindow {
 
                             Text {
                                 text: toolbar.fitsOutsideBottom ? (backendDropdown.showMenu ? "󰅃" : "󰅀") : (backendDropdown.showMenu ? "󰅀" : "󰅃")
-                                font.family: "Iosevka Nerd Font"
+                                font.family: ThemeBackend.iconFont
                                 font.pixelSize: s(13)
                                 color: backendDropdown.showMenu ? ThemeBackend.mauve : ThemeBackend.subtext0
                                 verticalAlignment: Text.AlignVCenter
@@ -1189,6 +1271,7 @@ PanelWindow {
                         anchors.fill: parent
                         iconOn: "󰓃"; iconOff: "󰓄"
                         volumeValue: root.deskVol; mutedValue: root.deskMute
+                        readOnly: root.liveAudioLevels; liveVolume: root.deskLiveVol
                         onVolumeUpdate: (v) => { root.deskVol = v; root.saveAudioPrefs() }
                         onMuteUpdate: (m) => { root.deskMute = m; root.saveAudioPrefs() }
                         onToggleSlider: {
@@ -1206,6 +1289,7 @@ PanelWindow {
                         anchors.fill: parent
                         iconOn: "󰍬"; iconOff: "󰍭"; hasDropdown: true
                         volumeValue: root.micVol; mutedValue: root.micMute
+                        readOnly: root.liveAudioLevels; liveVolume: root.micLiveVol
                         onVolumeUpdate: (v) => { root.micVol = v; root.saveAudioPrefs() }
                         onMuteUpdate: (m) => { root.micMute = m; root.saveAudioPrefs() }
                         onToggleSlider: {
@@ -1230,14 +1314,19 @@ PanelWindow {
 
                 AnimWrap {
                     isShown: !root.isVideoMode; contentWidth: s(36)
+                    IconButton { size: s(36); cornerRadius: ThemeBackend.borderRadius; buttonIcon: "󱄽"; iconFontSize: s(18); accentColor: ThemeBackend.surface0; textColor: ThemeBackend.text; onClicked: root.performOcr() }
+                }
+
+                AnimWrap {
+                    isShown: !root.isVideoMode; contentWidth: s(36)
                     IconButton { size: s(36); cornerRadius: ThemeBackend.borderRadius; buttonIcon: root.isMaximized ? "" : ""; iconFontSize: s(18); accentColor: ThemeBackend.surface0; textColor: ThemeBackend.text; onClicked: root.toggleMaximize() }
                 }
 
                 Item {
                     width: s(36); height: parent.height
-                    IconButton { 
+                    CloseButton { 
                         anchors.verticalCenter: parent.verticalCenter
-                        size: s(36); cornerRadius: ThemeBackend.borderRadius; buttonIcon: "󰅖"; iconFontSize: s(18); accentColor: ThemeBackend.red; textColor: ThemeBackend.crust; onClicked: root.deactivate() 
+                        size: s(36); cornerRadius: ThemeBackend.borderRadius; iconFontSize: s(18); accentColor: ThemeBackend.red; textColor: ThemeBackend.crust; onClicked: root.deactivate() 
                     }
                 }
             }
@@ -1290,9 +1379,6 @@ PanelWindow {
                         anchors.fill: parent
                         radius: width / 2
                         color: "transparent"
-                        border.color: root.isVideoMode ? Qt.alpha(ThemeBackend.red, 0.4) : Qt.alpha(ThemeBackend.surface1, 0.8)
-                        border.width: s(2)
-                        Behavior on border.color { enabled: root.animateChanges && !root.isRefreezing; ColorAnimation { duration: 250 } }
                     }
 
                     Rectangle {
@@ -1302,7 +1388,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         color: root.isVideoMode ? ThemeBackend.red : ThemeBackend.mauve
                         Behavior on color { enabled: root.animateChanges && !root.isRefreezing; ColorAnimation { duration: 250 } }
-                        Behavior on width { enabled: root.animateChanges && !root.isRefreezing; NumberAnimation { duration: 350; easing.type: Easing.OutBack } }
+                        Behavior on width { enabled: root.animateChanges && !root.isRefreezing; NumberAnimation { duration: 400; easing.type: Easing.OutBack } }
                     }
 
                     MouseArea {
@@ -1356,9 +1442,17 @@ PanelWindow {
                 width: qrPopupLayout.implicitWidth + s(32)
                 height: s(52)
                 radius: ThemeBackend.borderRadius
-                color: ThemeBackend.base
-                border.color: model.qSuccess ? ThemeBackend.green : ThemeBackend.red
-                border.width: s(2)
+                color: ThemeBackend.liquidGlass ? Qt.alpha(ThemeBackend.base, ThemeBackend.elementOpacity) : ThemeBackend.base
+
+                WallpaperBlur {
+                    z: -1
+                    anchors.fill: parent
+                    surfaceEnabled: ThemeBackend.liquidGlass
+                    topLeftRadius: parent.radius
+                    topRightRadius: parent.radius
+                    bottomLeftRadius: parent.radius
+                    bottomRightRadius: parent.radius
+                }
 
                 property bool isHovered: maHover.containsMouse
                 scale: isHovered ? 1.0 : model.qBaseScale
@@ -1420,25 +1514,26 @@ PanelWindow {
                     }
 
                     Rectangle { width: s(2); Layout.fillHeight: true; Layout.topMargin: s(10); Layout.bottomMargin: s(10); color: ThemeBackend.surface0; radius: s(1) }
-                    IconButton { size: s(36); cornerRadius: ThemeBackend.borderRadius; buttonIcon: "󰅖"; iconFontSize: s(18); accentColor: ThemeBackend.red; textColor: ThemeBackend.crust; onClicked: root.showQrPopup = false }
+                    CloseButton { size: s(36); cornerRadius: ThemeBackend.borderRadius; iconFontSize: s(18); accentColor: ThemeBackend.red; textColor: ThemeBackend.crust; onClicked: root.showQrPopup = false }
                 }
             }
         }
     }
 
-    Process {
+    FileView {
         id: qrReaderProcess
-        property string accumulated: ""
-        command: ["cat", Caching.getRunDir("screenshot") + "/qr_result"]
-        stdout: SplitParser { splitMarker: ""; onRead: data => qrReaderProcess.accumulated += data }
+        path: Caching.getRunDir("screenshot") + "/qr_result"
+        printErrors: false
 
-        onExited: (exitCode) => {
-            let res = qrReaderProcess.accumulated.trim();
-            qrReaderProcess.accumulated = "";
+        onLoaded: handleResult(text().trim())
+        onLoadFailed: handleResult("")
+
+        function handleResult(res) {
+            if (!root.isScanningQr) return;
             root.isScanningQr = false;
             qrModel.clear();
 
-            if (exitCode !== 0 || res === "") {
+            if (res === "") {
                 qrModel.append({ 
                     qX: root.selX + (root.selW / 2), qY: root.selY + (root.selH / 2), qW: 0, qH: 0, 
                     qText: I18n.t("screenshot.qr_timeout"), qSuccess: false,
@@ -1524,7 +1619,7 @@ PanelWindow {
 
             root.isQrSuccess = anySuccess;
             root.showQrPopup = true;
-            Quickshell.execDetached(["bash", "-c", "rm -f " + Caching.getRunDir("screenshot") + "/qr_result"]);
+            Quickshell.execDetached(["rm", "-f", Caching.getRunDir("screenshot") + "/qr_result"]);
         }
     }
 
@@ -1532,16 +1627,34 @@ PanelWindow {
         id: qrWaitTimer
         interval: 1200
         repeat: false
-        onTriggered: qrReaderProcess.running = true
+        onTriggered: qrReaderProcess.reload()
     }
 
     function performQrScan() {
-        Quickshell.execDetached(["bash", "-c", "rm -f " + Caching.getRunDir("screenshot") + "/qr_result"]);
+        Quickshell.execDetached(["rm", "-f", Caching.getRunDir("screenshot") + "/qr_result"]);
         root.isScanningQr = true; root.showQrPopup = false; qrModel.clear();
         let cmd = `bash ${Caching.serpantinumDir}/scripts/screenshot.sh --geometry "${root.geometryString}" --scan-qr`;
+        cmd += root.frozenSourceArgs();
         Quickshell.execDetached(["bash", "-c", cmd]);
         qrWaitTimer.start();
     }   
+
+    function performOcr() {
+        let cmd = `bash ${Caching.serpantinumDir}/scripts/screenshot.sh --geometry "${root.geometryString}" --ocr`;
+        let useFrozen = root.frozenSourceArgs() !== "";
+        if (useFrozen) {
+            cmd += root.frozenSourceArgs();
+            root.freezeImg = "";
+        }
+        root.animateChanges = false;
+        if (useFrozen) {
+            Quickshell.execDetached(["bash", "-c", cmd]);
+        } else {
+            captureTimer.pendingCmd = cmd;
+            captureTimer.start();
+        }
+        root.deactivate();
+    }
 
     Timer {
         id: captureTimer
@@ -1553,8 +1666,19 @@ PanelWindow {
         }
     }
 
+    function frozenSourceArgs() {
+        if (root.freezeImg === "" || root.isVideoMode || root.isRefreezing) return "";
+        let rect = `${Math.round(root.selX)},${Math.round(root.selY)} ${Math.round(root.selW)}x${Math.round(root.selH)}`;
+        return ` --source "${root.freezeImg}" --crop "${rect}" --logical-size "${Math.round(root.width)}x${Math.round(root.height)}"`;
+    }
+
     function executeCapture(openEditor, isRecord) {
         let cmd = `bash ${Caching.serpantinumDir}/scripts/screenshot.sh --geometry "${root.geometryString}"`;
+        let useFrozen = !isRecord && root.frozenSourceArgs() !== "";
+        if (useFrozen) {
+            cmd += root.frozenSourceArgs();
+            root.freezeImg = "";
+        }
         if (isRecord) {
             if (root.targetMonitorName !== "") cmd += ` --monitor "${root.targetMonitorName}"`;
             cmd += " --record";
@@ -1565,9 +1689,13 @@ PanelWindow {
         }
         if (openEditor) cmd += " --edit";
 
-        captureTimer.pendingCmd = cmd;
         root.animateChanges = false;
-        captureTimer.start();
+        if (useFrozen) {
+            Quickshell.execDetached(["bash", "-c", cmd]);
+        } else {
+            captureTimer.pendingCmd = cmd;
+            captureTimer.start();
+        }
         root.deactivate();
     }
 }

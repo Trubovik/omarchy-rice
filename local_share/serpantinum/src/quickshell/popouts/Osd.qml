@@ -172,19 +172,13 @@ PanelWindow {
         return barConfig.position || "top";
     }
 
-    property real barOpacity: {
-        if (!barConfig || barConfig.opacity === undefined) return 1.0;
-        let op = Number(barConfig.opacity);
-        return op > 1.0 ? (op / 100.0) : op;
-    }
-
     property bool isFullscreen: OsdController.isFullscreen
     readonly property bool isBarEffectivelyHidden: barAutohide || isFullscreen
     property bool isSideBar: barPosition === "left" || barPosition === "right"
     property bool isRightBar: barPosition === "right"
     property bool isBottomBar: barPosition === "bottom"
     property bool isFill: barStyle === "fill"
-    property bool isSolid: (barStyle === "solid" || barStyle === "fill") && Math.round(barOpacity * 100) >= 100
+    property bool isSolid: barStyle === "solid" || barStyle === "fill"
     readonly property bool isAttached: attachToBar && isSolid && !isBarEffectivelyHidden && (!isSideBar || !isToggleKind) && (isSideBar ? isVertical : !isVertical)
     readonly property bool isVerticalLayout: isAttached ? isSideBar : isVertical
 
@@ -273,14 +267,24 @@ PanelWindow {
 
     Timer {
         id: briCmdThrottle
-        interval: 400
+        interval: 120
         property int targetPct: -1
         onTriggered: {
             if (targetPct >= 0) {
-                Quickshell.execDetached(["bash", Caching.qsDir + "/../scripts/brightness.sh", "set", targetPct.toString()]);
+                Quickshell.execDetached(["serpantinum-core", "brightness", "set", targetPct.toString()]);
                 targetPct = -1;
             }
         }
+    }
+
+    AttachedSurface {
+        kind: "osd"
+        visible: osdContainer.opacity > 0.001 && osdContainer.width > 0 && osdContainer.height > 0
+        opacity: osdContainer.opacity
+        rects: [{ x: osdContainer.x, y: osdContainer.y, w: osdContainer.width, h: osdContainer.height, r: [osdBox.topLeftRadius, osdBox.topRightRadius, osdBox.bottomRightRadius, osdBox.bottomLeftRadius] }]
+        filletRadius: (osdWindow.isAttached && osdContainer.dynamicCornerRadius > 0.5) ? osdContainer.dynamicCornerRadius : 0
+        attachTo: osdWindow.isAttached ? ["bar"] : []
+        publishShape: osdWindow.isAttached
     }
 
     Item {
@@ -350,139 +354,20 @@ PanelWindow {
             return Item.Center;
         }
 
-        ShaderEffect {
-            visible: osdWindow.isAttached && osdContainer.dynamicCornerRadius > 0.5
-            x: {
-                if (osdWindow.isSideBar) {
-                    return osdWindow.isRightBar ? (parent.width - osdContainer.dynamicCornerRadius) : 0;
-                }
-                return -osdContainer.dynamicCornerRadius;
-            }
-            y: {
-                if (osdWindow.isSideBar) {
-                    return -osdContainer.dynamicCornerRadius;
-                }
-                return osdWindow.isBottomBar ? (parent.height - osdContainer.dynamicCornerRadius) : 0;
-            }
-            width: osdContainer.dynamicCornerRadius
-            height: osdContainer.dynamicCornerRadius
-            property vector2d itemSize: Qt.vector2d(width, height)
-            property real cornerIndex: {
-                if (osdWindow.isSideBar) {
-                    return osdWindow.isRightBar ? 3.0 : 2.0;
-                }
-                return osdWindow.isBottomBar ? 3.0 : 1.0;
-            }
-            property color color: ThemeBackend.base
-            fragmentShader: "file://" + Caching.serpantinumDir + "/assets/shaders/ui/corner_cutout.frag.qsb"
-        }
-
-        ShaderEffect {
-            visible: osdWindow.isAttached && osdContainer.dynamicCornerRadius > 0.5
-            x: {
-                if (osdWindow.isSideBar) {
-                    return osdWindow.isRightBar ? (parent.width - osdContainer.dynamicCornerRadius) : 0;
-                }
-                return parent.width;
-            }
-            y: {
-                if (osdWindow.isSideBar) {
-                    return parent.height;
-                }
-                return osdWindow.isBottomBar ? (parent.height - osdContainer.dynamicCornerRadius) : 0;
-            }
-            width: osdContainer.dynamicCornerRadius
-            height: osdContainer.dynamicCornerRadius
-            property vector2d itemSize: Qt.vector2d(width, height)
-            property real cornerIndex: {
-                if (osdWindow.isSideBar) {
-                    return osdWindow.isRightBar ? 1.0 : 0.0;
-                }
-                return osdWindow.isBottomBar ? 2.0 : 0.0;
-            }
-            property color color: ThemeBackend.base
-            fragmentShader: "file://" + Caching.serpantinumDir + "/assets/shaders/ui/corner_cutout.frag.qsb"
-        }
         Rectangle {
             id: osdBox
             anchors.fill: parent
-            color: ThemeBackend.base
+            color: "transparent"
             radius: osdWindow.cornerRadius
-            border.width: osdWindow.isAttached ? 0 : 1
-            border.color: osdWindow.isAttached ? "transparent" : ThemeBackend.surface0
+            readonly property bool flatTop: osdWindow.isAttached && !osdWindow.isSideBar && !osdWindow.isBottomBar
+            readonly property bool flatBottom: osdWindow.isAttached && !osdWindow.isSideBar && osdWindow.isBottomBar
+            readonly property bool flatLeft: osdWindow.isAttached && osdWindow.isSideBar && !osdWindow.isRightBar
+            readonly property bool flatRight: osdWindow.isAttached && osdWindow.isSideBar && osdWindow.isRightBar
+            topLeftRadius: (flatTop || flatLeft) ? 0 : osdWindow.cornerRadius
+            topRightRadius: (flatTop || flatRight) ? 0 : osdWindow.cornerRadius
+            bottomLeftRadius: (flatBottom || flatLeft) ? 0 : osdWindow.cornerRadius
+            bottomRightRadius: (flatBottom || flatRight) ? 0 : osdWindow.cornerRadius
             clip: true
-
-            Rectangle {
-                visible: osdWindow.isAttached && !osdWindow.isSideBar && !osdWindow.isBottomBar && osdContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: 0
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: osdWindow.isAttached && !osdWindow.isSideBar && !osdWindow.isBottomBar && osdContainer.dynamicCornerRadius > 0.5
-                x: parent.width - osdContainer.dynamicCornerRadius
-                y: 0
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: osdWindow.isAttached && !osdWindow.isSideBar && osdWindow.isBottomBar && osdContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: parent.height - osdContainer.dynamicCornerRadius
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: osdWindow.isAttached && !osdWindow.isSideBar && osdWindow.isBottomBar && osdContainer.dynamicCornerRadius > 0.5
-                x: parent.width - osdContainer.dynamicCornerRadius
-                y: parent.height - osdContainer.dynamicCornerRadius
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: osdWindow.isAttached && osdWindow.isSideBar && !osdWindow.isRightBar && osdContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: 0
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: osdWindow.isAttached && osdWindow.isSideBar && !osdWindow.isRightBar && osdContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: parent.height - osdContainer.dynamicCornerRadius
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: osdWindow.isAttached && osdWindow.isSideBar && osdWindow.isRightBar && osdContainer.dynamicCornerRadius > 0.5
-                x: parent.width - osdContainer.dynamicCornerRadius
-                y: 0
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: osdWindow.isAttached && osdWindow.isSideBar && osdWindow.isRightBar && osdContainer.dynamicCornerRadius > 0.5
-                x: parent.width - osdContainer.dynamicCornerRadius
-                y: parent.height - osdContainer.dynamicCornerRadius
-                width: osdContainer.dynamicCornerRadius
-                height: osdContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
 
             HoverHandler {
                 id: osdHoverHandler
@@ -508,12 +393,6 @@ PanelWindow {
                 IconButton {
                     Layout.alignment: Qt.AlignHCenter
                     size: osdWindow.s(26)
-                    iconOffsetX: {
-                        if (osdWindow.kind === "airplane" || osdWindow.kind === "capslock") return -1;
-                        if (osdWindow.kind === "volume") return -1;
-                        if (osdWindow.kind === "mic") return 0;
-                        return -3;
-                    }
                     cornerRadius: osdWindow.s(8)
                     buttonIcon: {
                         if (osdWindow.kind === "volume") {
@@ -567,7 +446,7 @@ PanelWindow {
                             briCmdThrottle.targetPct = -1;
                             let target = osdWindow.briVal > 0 ? 0 : 100;
                             OsdController.briVal = target;
-                            Quickshell.execDetached(["bash", Caching.qsDir + "/../scripts/brightness.sh", "set", target.toString()]);
+                            Quickshell.execDetached(["serpantinum-core", "brightness", "set", target.toString()]);
                         }
                     }
                 }
@@ -579,8 +458,6 @@ PanelWindow {
                     Layout.preferredHeight: osdWindow.s(22)
                     radius: osdWindow.s(6)
                     color: osdWindow.isToggleActive ? Qt.rgba(osdWindow.toggleActiveColor.r, osdWindow.toggleActiveColor.g, osdWindow.toggleActiveColor.b, 0.2) : ThemeBackend.surface1
-                    border.width: 1
-                    border.color: osdWindow.isToggleActive ? osdWindow.toggleActiveColor : "transparent"
 
                     Text {
                         anchors.centerIn: parent
@@ -632,7 +509,7 @@ PanelWindow {
                         OsdController.restartTimer();
                         if (osdWindow.kind === "brightness" && briCmdThrottle.targetPct >= 0) {
                             briCmdThrottle.stop();
-                            Quickshell.execDetached(["bash", Caching.qsDir + "/../scripts/brightness.sh", "set", briCmdThrottle.targetPct.toString()]);
+                            Quickshell.execDetached(["serpantinum-core", "brightness", "set", briCmdThrottle.targetPct.toString()]);
                             briCmdThrottle.targetPct = -1;
                         }
                     }
@@ -642,7 +519,7 @@ PanelWindow {
                         if (osdWindow.kind === "brightness") {
                             OsdController.briVal = pct;
                             briCmdThrottle.targetPct = pct;
-                            if (!verticalSlider.isDragging) briCmdThrottle.restart();
+                            if (!briCmdThrottle.running) briCmdThrottle.start();
                         } else if (osdWindow.kind === "volume") {
                             cmdThrottle.targetPct = pct;
                             if (!cmdThrottle.running) cmdThrottle.start();
@@ -685,12 +562,6 @@ PanelWindow {
                         anchors.centerIn: parent
                         size: osdWindow.s(30)
                         cornerRadius: osdWindow.s(8)
-                        iconOffsetX: {
-                            if (osdWindow.kind === "airplane" || osdWindow.kind === "capslock") return -1;
-                            if (osdWindow.kind === "volume") return -1;
-                            if (osdWindow.kind === "mic") return 0;
-                            return -3;
-                        }
                         buttonIcon: {
                             if (osdWindow.kind === "volume") {
                                 return osdWindow.isMuted || osdWindow.volVal === 0 ? "󰖁" : (osdWindow.volVal > 50 ? "󰕾" : "󰖀");
@@ -743,7 +614,7 @@ PanelWindow {
                                 briCmdThrottle.targetPct = -1;
                                 let target = osdWindow.briVal > 0 ? 0 : 100;
                                 OsdController.briVal = target;
-                                Quickshell.execDetached(["bash", Caching.qsDir + "/../scripts/brightness.sh", "set", target.toString()]);
+                                Quickshell.execDetached(["serpantinum-core", "brightness", "set", target.toString()]);
                             }
                         }
                     }
@@ -842,7 +713,7 @@ PanelWindow {
                         OsdController.restartTimer();
                         if (osdWindow.kind === "brightness" && briCmdThrottle.targetPct >= 0) {
                             briCmdThrottle.stop();
-                            Quickshell.execDetached(["bash", Caching.qsDir + "/../scripts/brightness.sh", "set", briCmdThrottle.targetPct.toString()]);
+                            Quickshell.execDetached(["serpantinum-core", "brightness", "set", briCmdThrottle.targetPct.toString()]);
                             briCmdThrottle.targetPct = -1;
                         }
                     }
@@ -852,7 +723,7 @@ PanelWindow {
                         if (osdWindow.kind === "brightness") {
                             OsdController.briVal = pct;
                             briCmdThrottle.targetPct = pct;
-                            if (!horizontalSlider.isDragging) briCmdThrottle.restart();
+                            if (!briCmdThrottle.running) briCmdThrottle.start();
                         } else if (osdWindow.kind === "volume") {
                             cmdThrottle.targetPct = pct;
                             if (!cmdThrottle.running) cmdThrottle.start();

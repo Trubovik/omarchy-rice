@@ -8,9 +8,10 @@ import "../../"
 Item {
     id: root
 
-    readonly property bool isDesktop: UPower.displayDevice.ready ? !UPower.displayDevice.isLaptopBattery : (typeof SystemInfo !== "undefined" ? SystemInfo.isDesktop : true)
-    readonly property int batteryPercentage: UPower.displayDevice.ready ? Math.round(UPower.displayDevice.percentage * 100) : 0
-    readonly property bool isCharging: UPower.displayDevice.ready && (UPower.displayDevice.state === UPowerDeviceState.Charging || UPower.displayDevice.state === UPowerDeviceState.FullyCharged)
+    readonly property bool hasBattery: Boolean(UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && UPower.displayDevice.isPresent)
+    readonly property bool isDesktop: UPower.displayDevice.ready ? !root.hasBattery : (typeof SystemInfo !== "undefined" ? SystemInfo.isDesktop : true)
+    readonly property int batteryPercentage: (UPower.displayDevice.ready && root.hasBattery) ? Math.round(UPower.displayDevice.percentage * 100) : 0
+    readonly property bool isCharging: root.hasBattery && UPower.displayDevice.ready && (UPower.displayDevice.state === UPowerDeviceState.Charging || UPower.displayDevice.state === UPowerDeviceState.FullyCharged)
     readonly property string stateFilePath: {
         let base = (typeof Caching !== "undefined" && Caching.runDir) ? Caching.runDir : "/tmp/serpantinum";
         return base + "/battery_notif_state.json";
@@ -25,6 +26,14 @@ Item {
     property real lastNotifTime: 0
     property string lastNotifType: ""
 
+    onHasBatteryChanged: {
+        if (!root.hasBattery) {
+            root.notifiedFull = false;
+            root.notifiedLow = false;
+            root.notifiedCritical = false;
+        }
+        root.checkBattery();
+    }
     onIsDesktopChanged: root.checkBattery()
 
     FileView {
@@ -63,8 +72,12 @@ Item {
             "lastNotifTime": root.lastNotifTime,
             "lastNotifType": root.lastNotifType
         });
-        let dir = (typeof Caching !== "undefined" && Caching.runDir) ? Caching.runDir : "/tmp/serpantinum";
-        Quickshell.execDetached(["bash", "-c", 'mkdir -p "$1" && printf "%s\\n" "$2" > "$3"', "_", dir, payload, root.stateFilePath]);
+        stateFileWriter.setText(payload + "\n");
+    }
+
+    FileView {
+        id: stateFileWriter
+        path: root.stateFilePath
     }
 
     function sendNotification(type, summary, body, icon, urgency) {
@@ -84,17 +97,18 @@ Item {
         let appName = I18n.t("sysnotif.battery.app_name");
         if (appName === "sysnotif.battery.app_name") appName = "System";
         Quickshell.execDetached([
-            "notify-send",
-            "-a", appName,
-            "-u", u,
-            "-i", ic,
+            "serpantinum-core", "notify",
+            "--app", appName,
+            "--urgency", u,
+            "--icon", ic,
+            "--",
             summary,
             body
         ]);
     }
 
     function checkBattery() {
-        if (root.isDesktop || !UPower.displayDevice.ready || (typeof I18n !== "undefined" && !I18n.isReady)) return;
+        if (!root.hasBattery || root.isDesktop || !UPower.displayDevice.ready || (typeof I18n !== "undefined" && !I18n.isReady)) return;
 
         if (!root.stateLoaded) {
             root.loadState();
@@ -138,7 +152,7 @@ Item {
                     "full",
                     title,
                     body,
-                    "battery-full-charged",
+                    "battery-kind-full",
                     "normal"
                 );
             }
@@ -154,8 +168,8 @@ Item {
                         "critical",
                         title,
                         body,
-                        "battery-level-0-symbolic",
-                        "critical"
+                        "battery-kind-critical",
+                        "normal"
                     );
                 }
             } else if (pct <= 20) {
@@ -168,8 +182,8 @@ Item {
                         "low",
                         title,
                         body,
-                        "battery-level-20-symbolic",
-                        "critical"
+                        "battery-kind-low",
+                        "normal"
                     );
                 }
             } else if (pct > 25) {
@@ -194,6 +208,8 @@ Item {
         function onPercentageChanged() { root.checkBattery(); }
         function onStateChanged() { root.checkBattery(); }
         function onReadyChanged() { root.checkBattery(); }
+        function onIsPresentChanged() { root.checkBattery(); }
+        function onIsLaptopBatteryChanged() { root.checkBattery(); }
     }
 
     Component.onCompleted: {

@@ -19,40 +19,49 @@ Item {
     property real diskTotalGb: 0.0
 
     property int subscribers: 0
-    property bool isScanningNet: false
     readonly property bool onBattery: UPower.displayDevice.ready && UPower.displayDevice.state === UPowerDeviceState.Discharging
 
     function subscribe() {
         subscribers++;
-        if (subscribers === 1) streamProc.running = true;
+        if (subscribers === 1) {
+            root.netPrimed = false;
+            streamProc.running = true;
+        }
     }
 
     function unsubscribe() {
         subscribers = Math.max(0, subscribers - 1);
-        if (subscribers === 0) streamProc.running = false;
+        if (subscribers === 0) {
+            streamProc.running = false;
+        }
     }
 
-    // Parses one cpu|ram%|ramGB|temp|rx|tx|disk%|diskUsedGB|diskTotalGB line.
+    property bool netPrimed: false
+
     function applyUsage(text, withNet) {
         text = text ? text.trim() : "";
         if (!text) return;
 
-        let p = text.split("|");
-        if (p.length >= 4) {
-            root.cpu = parseInt(p[0]);
-            root.ramPercent = parseInt(p[1]);
-            root.ramGb = parseFloat(p[2]);
-            root.temp = parseInt(p[3]);
+        let u;
+        try {
+            u = JSON.parse(text);
+        } catch (e) {
+            return;
         }
-        if (withNet && p.length >= 6) {
-            root.netRx = parseFloat(p[4]);
-            root.netTx = parseFloat(p[5]);
+        root.cpu = u.cpu;
+        root.ramPercent = u.ramPercent;
+        root.ramGb = u.ramGb;
+        root.temp = u.temp;
+        if (withNet) {
+            if (root.netPrimed) {
+                root.netRx = u.netRx || 0;
+                root.netTx = u.netTx || 0;
+            }
+            root.netPrimed = true;
         }
-        if (p.length >= 9) {
-            root.diskPercent = parseInt(p[6]);
-            root.diskGb = parseFloat(p[7]);
-            root.diskTotalGb = parseFloat(p[8]);
-        }
+        root.diskPercent = u.diskPercent;
+        root.diskGb = u.diskUsedGb;
+        root.diskTotalGb = u.diskTotalGb;
     }
 
     function prewarm() {
@@ -60,16 +69,6 @@ Item {
             fetchProc.running = true;
         }
     }
-
-    function scanNetwork() {
-        if (isScanningNet) return;
-        isScanningNet = true;
-        netScanProc.running = false;
-        netScanProc.running = true;
-    }
-
-    // Samples are rewritten every tick, so they live on tmpfs rather than in ~/.cache.
-    readonly property string stateDir: Caching.getRunDir("sysdata")
 
     // One long-running fetcher while anything is subscribed, printing a line per tick.
     property int streamInterval: root.onBattery ? 4 : 2
@@ -83,33 +82,18 @@ Item {
     Process {
         id: streamProc
         running: false
-        command: ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh", "--stream", String(root.streamInterval)]
-        environment: ({ QS_RUN_SYSDATA: root.stateDir })
+        command: ["serpantinum-core", "watch", "sysinfo", "--interval", String(root.streamInterval)]
         stdout: SplitParser {
-            onRead: data => root.applyUsage(data, false)
+            onRead: data => root.applyUsage(data, true)
         }
     }
 
     Process {
         id: fetchProc
         running: false
-        command: ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh"]
-        environment: ({ QS_RUN_SYSDATA: root.stateDir })
+        command: ["serpantinum-core", "sysinfo"]
         stdout: StdioCollector {
-            onStreamFinished: root.applyUsage(this.text, false)
-        }
-    }
-
-    Process {
-        id: netScanProc
-        running: false
-        command: ["bash", Caching.qsDir + "/watchers/sys_fetcher.sh"]
-        environment: ({ QS_RUN_SYSDATA: root.stateDir })
-        stdout: StdioCollector {
-            onStreamFinished: {
-                root.applyUsage(this.text, true);
-                root.isScanningNet = false;
-            }
+            onStreamFinished: root.applyUsage(this.text)
         }
     }
 }

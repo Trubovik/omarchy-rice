@@ -20,14 +20,19 @@ Popup {
     modal: true
     dim: true
     z: 300000
-    width: Scaler.s(960)
-    height: Scaler.s(640)
+    property real preferredWidth: Scaler.s(960)
+    property real preferredHeight: Scaler.s(640)
+    readonly property real maxPickerWidth: parent && parent.width > 0 ? parent.width * 0.92 : preferredWidth
+    readonly property real maxPickerHeight: parent && parent.height > 0 ? parent.height * 0.92 : preferredHeight
+    width: Math.round(Math.max(Math.min(preferredWidth, maxPickerWidth), Math.min(Scaler.s(320), maxPickerWidth)))
+    height: Math.round(Math.max(Math.min(preferredHeight, maxPickerHeight), Math.min(Scaler.s(300), maxPickerHeight)))
     padding: Scaler.s(18)
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
     property var rootObj
     property var nameFilters: ["*"]
     property string titleText: typeof I18n !== "undefined" ? I18n.t("guide.file_picker.title") : ""
+    property string doneButtonText: typeof I18n !== "undefined" ? I18n.t("guide.file_picker.done") : "Done"
     property var places: []
     property Component previewComponent: null
     property bool showPreview: false
@@ -44,6 +49,11 @@ Popup {
 
     property string selectedFilePath: ""
     property string selectedFileName: ""
+    property bool saveMode: false
+    property string saveFileName: ""
+    onSelectedFileNameChanged: {
+        if (saveMode && selectedFileName !== "") saveFileName = selectedFileName;
+    }
     property string lastVisitedFolder: ""
 
     property int currentPlaceIndex: {
@@ -119,13 +129,21 @@ Popup {
                     }
                     pickerRoot.confirmSelection();
                 }
-            } else if (pickerRoot.selectedFilePath !== "") {
+            } else if (pickerRoot.saveMode || pickerRoot.selectedFilePath !== "") {
                 pickerRoot.confirmSelection();
             }
         }
     }
 
     function confirmSelection() {
+        if (pickerRoot.saveMode) {
+            let name = pickerRoot.saveFileName.trim().replace(/\//g, "_");
+            if (name === "") return;
+            let dir = pickerRoot.getAbsolutePath(folderModel.folder).replace(/\/$/, "");
+            pickerRoot.fileSelected(dir + "/" + name, name);
+            pickerRoot.close();
+            return;
+        }
         if (pickerRoot.selectedFilePath !== "") {
             pickerRoot.fileSelected(pickerRoot.selectedFilePath, pickerRoot.selectedFileName);
             pickerRoot.close();
@@ -145,7 +163,16 @@ Popup {
         }
     }
 
+    function openSave(initialDir, initialName) {
+        saveMode = true;
+        saveFileName = initialName || "";
+        if (initialDir) lastVisitedFolder = "file://" + initialDir;
+        openWithOptionalPath("");
+        saveFileName = initialName || "";
+    }
+
     function openWithOptionalPath(initialPath) {
+        if (!initialPath && !saveMode) saveFileName = "";
         if (searchInput) {
             searchInput.clear();
         }
@@ -228,8 +255,6 @@ Popup {
     background: Rectangle {
         color: ThemeBackend.base
         radius: pickerRoot.crLarge
-        border.color: ThemeBackend.surface0
-        border.width: 1
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
@@ -252,11 +277,10 @@ Popup {
                 font.weight: Font.Bold
                 Layout.fillWidth: true
             }
-            IconButton {
+            CloseButton {
                 Layout.preferredWidth: pickerRoot.toolbarHeight
                 Layout.preferredHeight: pickerRoot.toolbarHeight
                 cornerRadius: pickerRoot.crSmall
-                buttonIcon: "󰅖"
                 iconFontSize: Scaler.s(14)
                 accentColor: ThemeBackend.surface1
                 textColor: ThemeBackend.text
@@ -348,7 +372,7 @@ Popup {
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: modelData.icon
-                                                font.family: "Iosevka Nerd Font"
+                                                font.family: ThemeBackend.iconFont
                                                 font.pixelSize: Scaler.s(16)
                                                 color: parent.parent.parent.isActive ? ThemeBackend.crust : (placeMa.containsMouse ? ThemeBackend.text : ThemeBackend.subtext0)
 
@@ -477,7 +501,7 @@ Popup {
                                         Text {
                                             text: "󰅂"
                                             color: ThemeBackend.surface2
-                                            font.family: "Iosevka Nerd Font"
+                                            font.family: ThemeBackend.iconFont
                                             font.pixelSize: Scaler.s(14)
                                             visible: index > 0
                                             anchors.verticalCenter: parent.verticalCenter
@@ -531,7 +555,6 @@ Popup {
                             iconFontSize: Scaler.s(16)
                             accentColor: ThemeBackend.mauve
                             baseColor: "transparent"
-                            cornerRadius: pickerRoot.crSmall
                             textColor: ThemeBackend.text
                             checked: folderModel.showHidden
                             onToggled: function(chk) {
@@ -572,7 +595,7 @@ Popup {
                         onCleared: {
                             searchDebounceTimer.restart();
                         }
-                        onAccepted: pickerRoot.confirmSelection()
+                        onAccepted: { if (!pickerRoot.saveMode) pickerRoot.confirmSelection(); }
                     }
                 }
 
@@ -634,7 +657,7 @@ Popup {
 
                                 Text {
                                     text: fileIsDir ? "󰉋" : "󰋩"
-                                    font.family: "Iosevka Nerd Font"
+                                    font.family: ThemeBackend.iconFont
                                     font.pixelSize: Scaler.s(16)
                                     color: fileIsDir ? ThemeBackend.blue : ThemeBackend.text
                                 }
@@ -686,7 +709,7 @@ Popup {
             }
 
             Loader {
-                Layout.preferredWidth: pickerRoot.previewWidth
+                Layout.preferredWidth: Math.min(pickerRoot.previewWidth, pickerRoot.width * 0.38)
                 Layout.fillHeight: true
                 sourceComponent: pickerRoot.previewComponent
                 visible: pickerRoot.showPreview
@@ -697,8 +720,26 @@ Popup {
             Layout.fillWidth: true
             spacing: Scaler.s(14)
 
+            Input {
+                Layout.fillWidth: true
+                Layout.preferredHeight: pickerRoot.actionHeight
+                visible: pickerRoot.saveMode
+                text: pickerRoot.saveFileName
+                baseColor: ThemeBackend.surface0
+                accentColor: ThemeBackend.mauve
+                textColor: ThemeBackend.text
+                subTextColor: ThemeBackend.subtext0
+                borderColor: "transparent"
+                cornerRadius: pickerRoot.crMedium
+                horizontalPadding: Scaler.s(12)
+                fontPixelSize: Scaler.s(13)
+                onTextEdited: function(txt) { pickerRoot.saveFileName = txt; }
+                onAccepted: pickerRoot.confirmSelection()
+            }
+
             Text {
                 Layout.fillWidth: true
+                visible: !pickerRoot.saveMode
                 text: {
                     if (pickerRoot.selectedFileName !== "") {
                         try {
@@ -715,34 +756,19 @@ Popup {
                 elide: Text.ElideRight
             }
 
-            RowLayout {
-                spacing: Scaler.s(6)
-
-                IconButton {
-                    Layout.preferredWidth: pickerRoot.actionHeight
-                    Layout.preferredHeight: pickerRoot.actionHeight
-                    cornerRadius: pickerRoot.crMedium
-                    buttonIcon: "󰅖"
-                    iconFontSize: Scaler.s(18)
-                    accentColor: ThemeBackend.surface1
-                    textColor: ThemeBackend.text
-                    onClicked: {
-                        pickerRoot.fileSelected("", "");
-                        pickerRoot.close();
-                    }
-                }
-
-                IconButton {
-                    Layout.preferredWidth: pickerRoot.actionHeight
-                    Layout.preferredHeight: pickerRoot.actionHeight
-                    cornerRadius: pickerRoot.crMedium
-                    buttonIcon: "󰄬"
-                    iconFontSize: Scaler.s(18)
-                    accentColor: pickerRoot.selectedFilePath !== "" ? ThemeBackend.mauve : ThemeBackend.surface0
-                    textColor: pickerRoot.selectedFilePath !== "" ? ThemeBackend.crust : ThemeBackend.subtext0
-                    enabled: pickerRoot.selectedFilePath !== ""
-                    onClicked: pickerRoot.confirmSelection()
-                }
+            ClickButton {
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredHeight: pickerRoot.actionHeight
+                implicitHeight: pickerRoot.actionHeight
+                horizontalPadding: Scaler.s(18)
+                cornerRadius: pickerRoot.crMedium
+                buttonText: pickerRoot.doneButtonText
+                textFontSize: Scaler.s(13)
+                readonly property bool ready: pickerRoot.saveMode ? pickerRoot.saveFileName.trim() !== "" : pickerRoot.selectedFilePath !== ""
+                accentColor: ready ? ThemeBackend.mauve : ThemeBackend.surface0
+                textColor: ready ? ThemeBackend.crust : ThemeBackend.subtext0
+                enabled: ready
+                onClicked: pickerRoot.confirmSelection()
             }
         }
     }

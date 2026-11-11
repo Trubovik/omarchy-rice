@@ -75,7 +75,14 @@ PanelWindow {
     property real cornerRadius: ThemeBackend.borderRadius || s(12)
     property real menuMargin: isSolid ? 0 : s(8)
 
-    visible: isVisible || menuContainer.animProgress > 0.001
+    SpringProgress {
+        id: reveal
+        open: sideMusicPopout.isVisible
+        openDuration: 520
+        closeDuration: 150
+    }
+
+    visible: reveal.active
 
     property real menuWidth: s(220)
     property real menuHeight: s(140)
@@ -211,18 +218,40 @@ PanelWindow {
         return Math.max(edgeBound, Math.min(sideMusicPopout.height - h - edgeBound, y));
     }
 
+    function surfaceRect() {
+        const sc = menuContainer.scale;
+        let ox = menuContainer.width / 2;
+        let oy = menuContainer.height / 2;
+        const o = menuContainer.transformOrigin;
+        if (o === Item.Top) oy = 0;
+        else if (o === Item.Bottom) oy = menuContainer.height;
+        else if (o === Item.Left) ox = 0;
+        else if (o === Item.Right) ox = menuContainer.width;
+        return {
+            x: menuContainer.x + ox * (1 - sc),
+            y: menuContainer.y + oy * (1 - sc),
+            w: menuContainer.width * sc,
+            h: menuContainer.height * sc,
+            r: [menuBox.topLeftRadius * sc, menuBox.topRightRadius * sc, menuBox.bottomRightRadius * sc, menuBox.bottomLeftRadius * sc]
+        };
+    }
+
+    AttachedSurface {
+        kind: "music"
+        visible: menuContainer.animProgress > 0.001 && menuContainer.width > 0 && menuContainer.height > 0
+        opacity: menuContainer.opacity
+        rects: [sideMusicPopout.surfaceRect()]
+        filletRadius: (sideMusicPopout.isSolid && menuContainer.dynamicCornerRadius > 0.5) ? menuContainer.dynamicCornerRadius : 0
+        attachTo: sideMusicPopout.isSolid ? ["bar"] : []
+        publishShape: sideMusicPopout.isSolid
+    }
+
     Item {
         id: menuContainer
 
         property real dynamicCornerRadius: sideMusicPopout.isSolid ? Math.max(0, Math.min(sideMusicPopout.cornerRadius, (sideMusicPopout.isSideBar ? width : height))) : 0
 
-        property real animProgress: sideMusicPopout.isVisible ? 1.0 : 0.0
-        Behavior on animProgress {
-            NumberAnimation {
-                duration: sideMusicPopout.isVisible ? 280 : 220
-                easing.type: Easing.OutCubic
-            }
-        }
+        readonly property real animProgress: reveal.value
 
         x: {
             if (sideMusicPopout.isSolid) {
@@ -272,7 +301,7 @@ PanelWindow {
             return sideMusicPopout.menuHeight;
         }
 
-        opacity: animProgress
+        opacity: sideMusicPopout.isSolid ? ((sideMusicPopout.isVisible || animProgress > 0.001) ? 1.0 : 0.0) : Math.max(0.0, Math.min(1.0, animProgress * 1.5))
         scale: !sideMusicPopout.isSolid ? (0.92 + (0.08 * animProgress)) : 1.0
 
         transformOrigin: {
@@ -282,140 +311,17 @@ PanelWindow {
             return sideMusicPopout.alignBottom ? Item.Bottom : Item.Top;
         }
 
-        ShaderEffect {
-            visible: sideMusicPopout.isSolid && menuContainer.dynamicCornerRadius > 0.5
-            x: {
-                if (sideMusicPopout.isSideBar) {
-                    return sideMusicPopout.alignRight ? (parent.width - menuContainer.dynamicCornerRadius) : 0;
-                }
-                return -menuContainer.dynamicCornerRadius;
-            }
-            y: {
-                if (sideMusicPopout.isSideBar) {
-                    return -menuContainer.dynamicCornerRadius;
-                }
-                return sideMusicPopout.alignBottom ? (parent.height - menuContainer.dynamicCornerRadius) : 0;
-            }
-            width: menuContainer.dynamicCornerRadius
-            height: menuContainer.dynamicCornerRadius
-            property vector2d itemSize: Qt.vector2d(width, height)
-            property real cornerIndex: {
-                if (sideMusicPopout.isSideBar) {
-                    return sideMusicPopout.alignRight ? 3.0 : 2.0;
-                }
-                return sideMusicPopout.alignBottom ? 3.0 : 1.0;
-            }
-            property color color: ThemeBackend.base
-            fragmentShader: "file://" + Caching.serpantinumDir + "/assets/shaders/ui/corner_cutout.frag.qsb"
-        }
-
-        ShaderEffect {
-            visible: sideMusicPopout.isSolid && menuContainer.dynamicCornerRadius > 0.5
-            x: {
-                if (sideMusicPopout.isSideBar) {
-                    return sideMusicPopout.alignRight ? (parent.width - menuContainer.dynamicCornerRadius) : 0;
-                }
-                return parent.width;
-            }
-            y: {
-                if (sideMusicPopout.isSideBar) {
-                    return parent.height;
-                }
-                return sideMusicPopout.alignBottom ? (parent.height - menuContainer.dynamicCornerRadius) : 0;
-            }
-            width: menuContainer.dynamicCornerRadius
-            height: menuContainer.dynamicCornerRadius
-            property vector2d itemSize: Qt.vector2d(width, height)
-            property real cornerIndex: {
-                if (sideMusicPopout.isSideBar) {
-                    return sideMusicPopout.alignRight ? 1.0 : 0.0;
-                }
-                return sideMusicPopout.alignBottom ? 2.0 : 0.0;
-            }
-            property color color: ThemeBackend.base
-            fragmentShader: "file://" + Caching.serpantinumDir + "/assets/shaders/ui/corner_cutout.frag.qsb"
-        }
-
         Rectangle {
             id: menuBox
             anchors.fill: parent
-            color: ThemeBackend.base
+            color: "transparent"
             radius: sideMusicPopout.cornerRadius
-            border.width: 0
-            border.color: "transparent"
+            readonly property bool flatCorners: sideMusicPopout.isSolid
+            topLeftRadius: (flatCorners && (sideMusicPopout.isSideBar ? !sideMusicPopout.alignRight : !sideMusicPopout.alignBottom)) ? 0 : sideMusicPopout.cornerRadius
+            topRightRadius: (flatCorners && (sideMusicPopout.isSideBar ? sideMusicPopout.alignRight : !sideMusicPopout.alignBottom)) ? 0 : sideMusicPopout.cornerRadius
+            bottomLeftRadius: (flatCorners && (sideMusicPopout.isSideBar ? !sideMusicPopout.alignRight : sideMusicPopout.alignBottom)) ? 0 : sideMusicPopout.cornerRadius
+            bottomRightRadius: (flatCorners && (sideMusicPopout.isSideBar ? sideMusicPopout.alignRight : sideMusicPopout.alignBottom)) ? 0 : sideMusicPopout.cornerRadius
             clip: true
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && !sideMusicPopout.isSideBar && !sideMusicPopout.alignBottom && menuContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: 0
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && !sideMusicPopout.isSideBar && !sideMusicPopout.alignBottom && menuContainer.dynamicCornerRadius > 0.5
-                x: parent.width - menuContainer.dynamicCornerRadius
-                y: 0
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && !sideMusicPopout.isSideBar && sideMusicPopout.alignBottom && menuContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: parent.height - menuContainer.dynamicCornerRadius
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && !sideMusicPopout.isSideBar && sideMusicPopout.alignBottom && menuContainer.dynamicCornerRadius > 0.5
-                x: parent.width - menuContainer.dynamicCornerRadius
-                y: parent.height - menuContainer.dynamicCornerRadius
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && sideMusicPopout.isSideBar && !sideMusicPopout.alignRight && menuContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: 0
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && sideMusicPopout.isSideBar && !sideMusicPopout.alignRight && menuContainer.dynamicCornerRadius > 0.5
-                x: 0
-                y: parent.height - menuContainer.dynamicCornerRadius
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && sideMusicPopout.isSideBar && sideMusicPopout.alignRight && menuContainer.dynamicCornerRadius > 0.5
-                x: parent.width - menuContainer.dynamicCornerRadius
-                y: 0
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
-
-            Rectangle {
-                visible: sideMusicPopout.isSolid && sideMusicPopout.isSideBar && sideMusicPopout.alignRight && menuContainer.dynamicCornerRadius > 0.5
-                x: parent.width - menuContainer.dynamicCornerRadius
-                y: parent.height - menuContainer.dynamicCornerRadius
-                width: menuContainer.dynamicCornerRadius
-                height: menuContainer.dynamicCornerRadius
-                color: ThemeBackend.base
-            }
 
             HoverHandler {
                 id: menuHoverHandler
@@ -464,67 +370,18 @@ PanelWindow {
                         anchors.fill: parent
                         spacing: sideMusicPopout.s(2)
 
-                        Item {
-                            id: titleClipArea
+                        MarqueeText {
                             Layout.fillWidth: true
                             Layout.preferredHeight: sideMusicPopout.s(18)
-                            clip: true
-
-                            property int marqueeSpacing: sideMusicPopout.s(40)
-
-                            Item {
-                                id: marqueeTrack
-                                height: parent.height
-
-                                Row {
-                                    spacing: titleClipArea.marqueeSpacing
-
-                                    Text {
-                                        id: titleMainText
-                                        text: isMediaActive ? (targetPlayer ? targetPlayer.trackTitle : "") : I18n.t("music.nothing_playing")
-                                        font.family: ThemeBackend.fontFamily
-                                        font.weight: Font.Black
-                                        font.pixelSize: sideMusicPopout.s(13)
-                                        color: ThemeBackend.text
-
-                                        onTextChanged: {
-                                            marqueeTrack.x = 0;
-                                            if (implicitWidth > titleClipArea.width) {
-                                                titleScrollAnimation.restart();
-                                            } else {
-                                                titleScrollAnimation.stop();
-                                            }
-                                        }
-                                    }
-
-                                    Text {
-                                        text: titleMainText.text
-                                        font.family: ThemeBackend.fontFamily
-                                        font.weight: Font.Black
-                                        font.pixelSize: sideMusicPopout.s(13)
-                                        color: ThemeBackend.text
-                                        visible: titleMainText.implicitWidth > titleClipArea.width
-                                    }
-                                }
-
-                                SequentialAnimation on x {
-                                    id: titleScrollAnimation
-                                    loops: Animation.Infinite
-                                    running: titleMainText.implicitWidth > titleClipArea.width && menuHoverHandler.hovered
-
-                                    onRunningChanged: {
-                                        if (!running) marqueeTrack.x = 0;
-                                    }
-
-                                    PauseAnimation { duration: 2500 }
-                                    NumberAnimation {
-                                        from: 0
-                                        to: -(titleMainText.implicitWidth + titleClipArea.marqueeSpacing)
-                                        duration: (titleMainText.implicitWidth + titleClipArea.marqueeSpacing) * 25
-                                    }
-                                    PropertyAction { target: marqueeTrack; property: "x"; value: 0 }
-                                }
-                            }
+                            text: isMediaActive ? (targetPlayer ? targetPlayer.trackTitle : "") : I18n.t("music.nothing_playing")
+                            color: ThemeBackend.text
+                            font.family: ThemeBackend.fontFamily
+                            font.weight: Font.Black
+                            font.pixelSize: sideMusicPopout.s(13)
+                            marqueeSpacing: sideMusicPopout.s(40)
+                            pauseDuration: 2500
+                            speed: 25
+                            active: menuHoverHandler.hovered
                         }
 
                         Text {
@@ -579,29 +436,16 @@ PanelWindow {
                     }
                 }
 
-                Draggable {
+                WavySeekBar {
                     id: popupProgBar
                     Layout.fillWidth: true
-                    Layout.preferredHeight: sideMusicPopout.s(12)
+                    Layout.preferredHeight: sideMusicPopout.s(26)
                     Layout.alignment: Qt.AlignVCenter
                     from: 0.0
                     to: (targetPlayer && typeof targetPlayer.length === "number" && !isNaN(targetPlayer.length)) ? targetPlayer.length : 100.0
                     value: sideMusicPopout.currentLivePosition
-                    showValueBubble: false
-                    showTooltip: false
-                    valueFormatter: function(v) { return "" }
-                    backgroundColor: ThemeBackend.surface0
-                    accentColor: ThemeBackend.mauve
-                    gradColor1: Qt.lighter(ThemeBackend.blue, 1.2)
-                    gradColor2: Qt.lighter(ThemeBackend.mauve, 1.15)
-                    gradColor3: Qt.lighter(ThemeBackend.mauve, 1.15)
-                    cornerRadius: ThemeBackend.borderRadius
-                    handleSize: sideMusicPopout.s(12)
-
-                    handleColor: Qt.lighter(ThemeBackend.blue, 1.15)
-                    handleHoverColor: Qt.lighter(ThemeBackend.mauve, 1.65)
-                    handleDragColor: Qt.lighter(ThemeBackend.mauve, 1.65)
-                    handleBorderColor: Qt.rgba(0, 0, 0, 0.2)
+                    playing: sideMusicPopout.isPlaying
+                    waveColor: ThemeBackend.mauve
 
                     property bool seekPending: false
 
@@ -620,12 +464,9 @@ PanelWindow {
                         }
                     }
 
-                    onDragStarted: {
-                        SideMusicController.cancelHide();
-                    }
-
-                    onDragFinished: {
-                        SideMusicController.requestHide();
+                    onIsDraggingChanged: {
+                        if (isDragging) SideMusicController.cancelHide();
+                        else SideMusicController.requestHide();
                     }
 
                     onMoved: val => {

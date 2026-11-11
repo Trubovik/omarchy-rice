@@ -1,10 +1,13 @@
 import QtQuick
+import "../../../reusables"
 import "../../../"
 
 Item {
     id: root
     anchors.fill: parent
     clip: true
+
+    property bool previewMode: false
 
     property real minWidth: 100
     property real minHeight: 100
@@ -14,19 +17,26 @@ Item {
     property real maxAspect: 1.0
     property bool isRound: true
 
-    property var currentTime: new Date()
+    property var fallbackTime: new Date()
+    readonly property var currentTime: DateTime.hasSeconds ? DateTime.now : fallbackTime
 
     Timer {
         interval: 1000
-        running: true
+        running: root.visible && !DateTime.hasSeconds
         repeat: true
-        onTriggered: root.currentTime = new Date()
+        onTriggered: root.fallbackTime = new Date()
     }
 
     Rectangle {
         anchors.fill: parent
         radius: width / 2
-        color: ThemeBackend.surface0
+        color: Qt.alpha(ThemeBackend.surface0, ThemeBackend.elementOpacity)
+
+        WallpaperBlur {
+            z: -1
+            anchors.fill: parent
+            radius: parent.radius
+        }
 
         Rectangle {
             width: parent.width * 0.045
