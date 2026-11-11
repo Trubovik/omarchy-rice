@@ -54,6 +54,15 @@ if [[ -d "$HOME/.local/share/serpantinum/src" ]]; then
   rsync -av --exclude="*.cache*" "$HOME/.local/share/serpantinum/src/" "$DOTFILES_DIR/local_share/serpantinum/src/"
 fi
 
+if [[ -d "$HOME/.local/share/serpantinum/bin" ]]; then
+  mkdir -p "$DOTFILES_DIR/local_share/serpantinum/bin"
+  rsync -av "$HOME/.local/share/serpantinum/bin/" "$DOTFILES_DIR/local_share/serpantinum/bin/"
+fi
+
+if [[ -f "$HOME/.local/share/serpantinum/version.txt" ]]; then
+  cp "$HOME/.local/share/serpantinum/version.txt" "$DOTFILES_DIR/local_share/serpantinum/"
+fi
+
 # Терминалы
 for term in foot alacritty kitty ghostty; do
   if [[ -d "$HOME/.config/$term" ]]; then
@@ -65,7 +74,7 @@ done
 echo "==> 3. Бэкап системных пользовательских скриптов (~/.local/bin)..."
 # Копируем только кастомные скрипты и утилиты, игнорируя бинарники > 50MB (например, agy.bin) и pycache
 mkdir -p "$BIN_DIR"
-for script in agy agy-account agy-accounts-gui agy_accounts_backend.py omarchy omarchy-agent omarchy-default-agent hypr-anim-gui; do
+for script in agy agy-account agy-accounts-gui agy_accounts_backend.py omarchy omarchy-agent omarchy-default-agent hypr-anim-gui serpantinum-core serpantinum-audio; do
   if [[ -f "$HOME/.local/bin/$script" ]]; then
     cp "$HOME/.local/bin/$script" "$BIN_DIR/"
   fi

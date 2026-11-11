@@ -37,9 +37,19 @@ fi
 
 # Восстановление кастомизаций Serpantinum
 if [[ -d "$DOTFILES_DIR/local_share/serpantinum/src" ]]; then
-  echo "==> 3.2 Восстановление кастомизаций Serpantinum..."
+  echo "==> 3.2 Восстановление Serpantinum (движок и кастомизации)..."
   mkdir -p "$HOME/.local/share/serpantinum/src"
   cp -r "$DOTFILES_DIR/local_share/serpantinum/src/"* "$HOME/.local/share/serpantinum/src/"
+fi
+
+if [[ -d "$DOTFILES_DIR/local_share/serpantinum/bin" ]]; then
+  mkdir -p "$HOME/.local/share/serpantinum/bin"
+  cp -r "$DOTFILES_DIR/local_share/serpantinum/bin/"* "$HOME/.local/share/serpantinum/bin/"
+  chmod +x "$HOME/.local/share/serpantinum/bin/"*
+fi
+
+if [[ -f "$DOTFILES_DIR/local_share/serpantinum/version.txt" ]]; then
+  cp "$DOTFILES_DIR/local_share/serpantinum/version.txt" "$HOME/.local/share/serpantinum/"
 fi
 
 # 3. Восстановление скриптов в ~/.local/bin
@@ -49,6 +59,8 @@ if [[ -d "$DOTFILES_DIR/bin" ]]; then
   cp -r "$DOTFILES_DIR/bin/"* "$HOME/.local/bin/"
   chmod +x "$HOME/.local/bin/"*
 fi
+ln -sf "$HOME/.local/share/serpantinum/bin/serpantinum" "$HOME/.local/bin/serpantinum"
+ln -sf "$HOME/.local/share/serpantinum/bin/serpantinumd" "$HOME/.local/bin/serpantinumd"
 
 # 4. Восстановление .desktop файлов
 echo "==> 5. Восстановление desktop-файлов..."
@@ -64,6 +76,13 @@ if [[ -f "$DOTFILES_DIR/home/.bashrc" ]]; then
 fi
 if [[ -f "$DOTFILES_DIR/home/.bash_profile" ]]; then
   cp "$DOTFILES_DIR/home/.bash_profile" "$HOME/.bash_profile"
+fi
+
+echo "==> 7. Запуск службы Serpantinum Shell..."
+if [[ -x "$HOME/.local/bin/serpantinumd" ]]; then
+  "$HOME/.local/bin/serpantinumd" stop 2>/dev/null || true
+  sleep 0.5
+  "$HOME/.local/bin/serpantinumd" start 2>/dev/null &
 fi
 
 echo "=========================================="
