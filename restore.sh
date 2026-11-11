@@ -28,6 +28,14 @@ if [[ -d "$DOTFILES_DIR/config" ]]; then
   cp -r "$DOTFILES_DIR/config/"* "$HOME/.config/"
 fi
 
+# Восстановление шрифтов
+if [[ -d "$DOTFILES_DIR/fonts" ]]; then
+  echo "==> 3.0 Установка шрифтов интерфейса и иконок..."
+  mkdir -p "$HOME/.local/share/fonts"
+  cp -r "$DOTFILES_DIR/fonts/"* "$HOME/.local/share/fonts/"
+  command -v fc-cache &>/dev/null && fc-cache -f "$HOME/.local/share/fonts" || true
+fi
+
 # Восстановление состояния виджетов
 if [[ -d "$DOTFILES_DIR/state/serpantinum/widgets" ]]; then
   echo "==> 3.1 Восстановление виджетов Serpantinum..."

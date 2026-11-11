@@ -63,11 +63,16 @@ if [[ -f "$HOME/.local/share/serpantinum/version.txt" ]]; then
   cp "$HOME/.local/share/serpantinum/version.txt" "$DOTFILES_DIR/local_share/serpantinum/"
 fi
 
-# Терминалы
-for term in foot alacritty kitty ghostty; do
-  if [[ -d "$HOME/.config/$term" ]]; then
-    mkdir -p "$CONFIG_DIR/$term"
-    rsync -av "$HOME/.config/$term/" "$CONFIG_DIR/$term/"
+# Шрифты интерфейса
+mkdir -p "$DOTFILES_DIR/fonts"
+for font in MaterialSymbolsRounded.ttf Rubik.ttf ReadexPro.ttf; do
+  [[ -f "$HOME/.local/share/fonts/$font" ]] && cp "$HOME/.local/share/fonts/$font" "$DOTFILES_DIR/fonts/"
+done
+
+# Дополнительные конфиги
+for cfg in cava fastfetch btop starship.toml gtk-3.0 gtk-4.0 qt5ct qt6ct environment.d; do
+  if [[ -e "$HOME/.config/$cfg" ]]; then
+    rsync -av "$HOME/.config/$cfg" "$CONFIG_DIR/"
   fi
 done
 

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Command to automatically backup Linux rice/setup and sync with GitHub
+
+set -euo pipefail
+
+DOTFILES_DIR="$HOME/dotfiles"
+MSG="${1:-Auto-save Linux rice setup $(date '+%Y-%m-%d %H:%M')}"
+
+if [[ ! -d "$DOTFILES_DIR" ]]; then
+  echo "Ошибка: Директория $DOTFILES_DIR не найдена." >&2
+  exit 1
+fi
+
+echo "==> Сохранение актуального состояния системы..."
+"$DOTFILES_DIR/backup.sh"
+
+cd "$DOTFILES_DIR"
+
+if [[ ! -d ".git" ]]; then
+  git init
+fi
+
+git add .
+if git diff --staged --quiet; then
+  echo "==> Изменений нет, репозиторий уже содержит актуальную сборку."
+else
+  git commit -m "$MSG"
+  echo "==> Изменения зафиксированы локально: $MSG"
+fi
+
+# Проверяем, настроен ли remote origin
+if git remote | grep -q "^origin$"; then
+  echo "==> Отправка на GitHub..."
+  git push -u origin HEAD || echo "Предупреждение: Не удалось сделать push на GitHub. Проверьте авторизацию gh / git."
+else
+  echo "==> Удалённый репозиторий GitHub пока не подключен."
+  echo "    Для привязки выполните один раз: gh repo create <имя_репозитория> --public --source=$DOTFILES_DIR --remote=origin --push"
+fi

@@ -1,0 +1,79 @@
+@define-color accent_color #f57396;
+@define-color accent_bg_color #f57396;
+@define-color accent_fg_color #100608;
+
+@define-color destructive_color #f57396;
+@define-color destructive_bg_color #f57396;
+@define-color destructive_fg_color #100608;
+
+@define-color error_color #f57396;
+@define-color error_bg_color #f57396;
+@define-color error_fg_color #100608;
+
+@define-color success_color #f5c2e7;
+@define-color success_bg_color #f5c2e7;
+@define-color success_fg_color #100608;
+
+@define-color warning_color #fab387;
+@define-color warning_bg_color #fab387;
+@define-color warning_fg_color #100608;
+
+@define-color window_bg_color #100608;
+@define-color window_fg_color #fce5eb;
+
+@define-color view_bg_color #18090d;
+@define-color view_fg_color #fce5eb;
+
+@define-color headerbar_bg_color #3d1822;
+@define-color headerbar_fg_color #fce5eb;
+@define-color headerbar_border_color #752e41;
+@define-color headerbar_backdrop_color #100608;
+@define-color headerbar_shade_color #000000;
+@define-color headerbar_darker_shade_color #000000;
+
+@define-color sidebar_bg_color #18090d;
+@define-color sidebar_fg_color #fce5eb;
+@define-color sidebar_backdrop_color #100608;
+@define-color sidebar_border_color #752e41;
+@define-color sidebar_shade_color #000000;
+
+@define-color secondary_sidebar_bg_color #3d1822;
+@define-color secondary_sidebar_fg_color #fce5eb;
+@define-color secondary_sidebar_backdrop_color #18090d;
+@define-color secondary_sidebar_border_color #752e41;
+@define-color secondary_sidebar_shade_color #000000;
+
+@define-color card_bg_color #592331;
+@define-color card_fg_color #fce5eb;
+@define-color card_shade_color #000000;
+
+@define-color dialog_bg_color #592331;
+@define-color dialog_fg_color #fce5eb;
+
+@define-color popover_bg_color #592331;
+@define-color popover_fg_color #fce5eb;
+@define-color popover_shade_color #000000;
+
+@define-color thumbnail_bg_color #592331;
+@define-color thumbnail_fg_color #fce5eb;
+
+@define-color shade_color alpha(#000000, 0.25);
+@define-color scrollbar_outline_color #752e41;
+
+@define-color theme_bg_color #100608;
+@define-color theme_fg_color #fce5eb;
+@define-color theme_base_color #18090d;
+@define-color theme_text_color #fce5eb;
+@define-color theme_selected_bg_color #f57396;
+@define-color theme_selected_fg_color #100608;
+@define-color theme_unfocused_bg_color #100608;
+@define-color theme_unfocused_fg_color #fce5eb;
+@define-color theme_unfocused_base_color #18090d;
+@define-color theme_unfocused_text_color #fce5eb;
+@define-color theme_unfocused_selected_bg_color #f57396;
+@define-color theme_unfocused_selected_fg_color #100608;
+@define-color insensitive_bg_color #3d1822;
+@define-color insensitive_fg_color #ecc2cf;
+@define-color insensitive_base_color #18090d;
+@define-color borders #752e41;
+@define-color unfocused_borders #752e41;

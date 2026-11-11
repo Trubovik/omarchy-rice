@@ -1,0 +1,45 @@
+#!/bin/bash
+# hypr-anim: Switch Hyprland animation presets on the fly
+
+ANIM_DIR="$HOME/.config/hypr/animations"
+CURRENT_FILE="$ANIM_DIR/current.lua"
+
+if [ ! -d "$ANIM_DIR" ]; then
+  echo "Error: Directory $ANIM_DIR not found." >&2
+  exit 1
+fi
+
+if [[ "$1" == "--list" || "$1" == "-l" || "$1" == "list" ]]; then
+  echo "Available animation presets:"
+  ls "$ANIM_DIR" | grep -v 'current.lua' | sed 's/\.lua$//' | sed 's/^/  - /'
+  exit 0
+fi
+
+PRESET="$1"
+
+if [ -z "$PRESET" ]; then
+  if command -v fzf &>/dev/null; then
+    PRESET=$(ls "$ANIM_DIR" | grep -v 'current.lua' | sed 's/\.lua$//' | fzf --prompt="Select Hyprland Animation Preset: " --height=40% --reverse)
+  else
+    echo "Available presets:"
+    ls "$ANIM_DIR" | grep -v 'current.lua' | sed 's/\.lua$//'
+    echo ""
+    read -rp "Enter preset name: " PRESET
+  fi
+fi
+
+if [ -z "$PRESET" ]; then
+  echo "Cancelled."
+  exit 0
+fi
+
+TARGET="$ANIM_DIR/${PRESET}.lua"
+if [ ! -f "$TARGET" ]; then
+  echo "Error: Preset '$PRESET' not found in $ANIM_DIR"
+  echo "Available: $(ls "$ANIM_DIR" | grep -v 'current.lua' | sed 's/\.lua$//' | tr '\n' ' ')"
+  exit 1
+fi
+
+cp "$TARGET" "$CURRENT_FILE"
+hyprctl reload &>/dev/null
+echo "✓ Animation preset '$PRESET' applied successfully!"

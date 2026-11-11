@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+clear
+echo -e "\033[38;2;80;250;123m"
+fastfetch
+echo -e "\033[0m"
+echo -e "\033[38;2;139;233;253m ⚡ void rice active • omarchy hyprland \033[0m"
+echo -e "\033[38;2;98;114;164m ──────────────────────────────────────────\033[0m"
+
+# Live loop to keep terminal alive and show uptime/ram
+while true; do
+  UPTIME=$(uptime -p 2>/dev/null || uptime)
+  MEM=$(free -h | awk '/Mem:/ {print $3 "/" $2}')
+  echo -ne "\r\033[38;2;80;250;123m ❯ \033[38;2;248;248;242mUp: \033[38;2;139;233;253m$UPTIME \033[38;2;98;114;164m| \033[38;2;248;248;242mRAM: \033[38;2;255;121;198m$MEM\033[0m   "
+  sleep 5
+done

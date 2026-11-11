@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+export QML_IMPORT_PATH="/home/trubovik/.config/quickshell/ii/mock_imports:${QML_IMPORT_PATH}"
+exec quickshell -n -p /home/trubovik/.config/quickshell/ii "$@"

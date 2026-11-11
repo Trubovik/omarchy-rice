@@ -1,0 +1,34 @@
+[general]
+framerate = 60
+bars = 0
+bar_width = 3
+bar_spacing = 1
+sensitivity = 75
+autosens = 1
+
+[smoothing]
+integral = 80
+monstercat = 1
+gravity = 120
+ignore = 0
+noise_reduction = 77
+
+[eq]
+1 = 1.0
+2 = 1.0
+3 = 1.1
+4 = 1.2
+5 = 1.5
+
+[color]
+# >>> serpantinum theme >>>
+theme = 'serpantinum'
+# <<< serpantinum theme <<<
+# serpantinum-disabled: background = '#3d1822'
+# serpantinum-disabled: foreground = '#f57396'
+
+# serpantinum-disabled: gradient = 1
+# serpantinum-disabled: gradient_count = 3
+# serpantinum-disabled: gradient_color_1 = '#f57396'
+# serpantinum-disabled: gradient_color_2 = '#f38ba8'
+# serpantinum-disabled: gradient_color_3 = '#cba6f7'

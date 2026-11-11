@@ -1,0 +1,18 @@
+#!/bin/bash
+# choose-wallpaper: Interactive wallpaper selector for Omarchy
+
+WALLPAPERS_DIR="$HOME/Pictures/Wallpapers"
+
+if ! command -v fzf &>/dev/null; then
+  echo "fzf not found." >&2
+  exit 1
+fi
+
+SELECTED=$(find -L "$WALLPAPERS_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | fzf --prompt="Select Wallpaper: " --height=50% --reverse)
+
+if [ -n "$SELECTED" ]; then
+  omarchy theme bg set "$SELECTED"
+  echo "✓ Applied wallpaper: $(basename "$SELECTED")"
+else
+  echo "Cancelled."
+fi

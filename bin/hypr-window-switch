@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Focus next window smoothly
+hyprctl eval "return hl.dsp.window.cycle_next()"

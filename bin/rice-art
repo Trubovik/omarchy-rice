@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+import time
+import os
+import sys
+
+# Aesthetic ASCII Art & System Status
+ART = r"""
+        &&%%% &
+       %%%|%%%%%%% &
+     & & &&&&&&&&&&&&&/
+     & &&&&&&&&&&&&&|& & &&
+     &&&&&&&&&&&&//-&&&&
+     &&&\\&\__&&&\\&\&& &
+    & &&\&&& &&\___//| &
+        &&&&|/|/\\/||
+        &&&\/|/\\//-|
+        /-|\/|||/-_/__/&& & &
+        |/-/\ ||\__/  /&&&&&&&
+        /-| \\|// |\   &&&&&&&
+           /-\|/-/ -      &
+             \--/
+              //-|
+             /--/
+             /-|\
+             /-\|
+            /---|
+           ./---/~~~~\.
+"""
+
+GREEN = "\033[38;2;80;250;123m"
+CYAN = "\033[38;2;139;233;253m"
+DIM = "\033[38;2;98;114;164m"
+RESET = "\033[0m"
+
+sys.stdout.write("\033[2J\033[H\033[?25l")
+sys.stdout.write(f"{GREEN}{ART}{RESET}\n")
+sys.stdout.write(f"  {CYAN}» just enter the void «{RESET}\n")
+sys.stdout.write(f"  {DIM}press Alt+Tab to switch{RESET}\n")
+sys.stdout.flush()
+
+try:
+    while True:
+        time.sleep(60)
+except KeyboardInterrupt:
+    sys.stdout.write("\033[?25h\n")

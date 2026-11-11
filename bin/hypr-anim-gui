@@ -12,6 +12,12 @@ ANIM_DIR = os.path.expanduser("~/.config/hypr/animations")
 CURRENT_FILE = os.path.join(ANIM_DIR, "current.lua")
 
 PRESET_META = {
+    "void": {
+        "title": "Void (TikTok Rice)",
+        "icon": "starred-symbolic",
+        "badge": "Вертикальный зум-слайд",
+        "desc": "Вертикальный отъезд рабочих пространств с глубиной и овершотом как на TikTok."
+    },
     "bouncy": {
         "title": "Bouncy",
         "icon": "emblem-favorite-symbolic",

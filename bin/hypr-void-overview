@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Void Rice / Zoom Switcher
+# Toggles overview zoom factor and scrolls windows
+
+STATE_FILE="/tmp/hypr_void_state"
+
+if [ -f "$STATE_FILE" ]; then
+    # Exit overview mode: restore zoom to 1.0
+    rm -f "$STATE_FILE"
+    hyprctl eval 'return hl.config({ cursor = { zoom_factor = 1.0 } })' >/dev/null 2>&1
+else
+    # Enter overview mode: zoom out to 0.75 and cycle next
+    touch "$STATE_FILE"
+    hyprctl eval 'return hl.config({ cursor = { zoom_factor = 0.75 } })' >/dev/null 2>&1
+    ~/.local/bin/hypr-window-switch next
+fi

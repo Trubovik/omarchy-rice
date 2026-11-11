@@ -1,0 +1,204 @@
+#!/usr/bin/env python3
+"""
+Antigravity Corner (Уголок кастомизации)
+Интерактивный центр управления виджетами, анимациями, живыми обоями и звуками.
+"""
+
+import os
+import sys
+import subprocess
+import glob
+
+GREEN = "\033[38;2;80;250;123m"
+CYAN = "\033[38;2;139;233;253m"
+PURPLE = "\033[38;2;189;147;249m"
+PINK = "\033[38;2;255;121;198m"
+YELLOW = "\033[38;2;241;250;140m"
+DIM = "\033[38;2;98;114;164m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
+
+SOUNDS_DIR = os.path.expanduser("~/.local/share/sounds/cyber-ui")
+LIVE_WP_DIR = os.path.expanduser("~/Pictures/Wallpapers/Live")
+ANIM_DIR = os.path.expanduser("~/.config/hypr/animations")
+
+def play_sound(name):
+    path = os.path.join(SOUNDS_DIR, f"{name}.wav")
+    if os.path.exists(path):
+        subprocess.Popen(["pw-play", "--volume", "0.3", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def run_cmd(cmd):
+    return subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+def show_header():
+    os.system("clear")
+    print(f"""{CYAN}{BOLD}
+    ╔════════════════════════════════════════════════════════════╗
+    ║             ★  A N T I G R A V I T Y   C O R N E R  ★      ║
+    ║             Уголок кастомизации и управления стилем         ║
+    ╚════════════════════════════════════════════════════════════╝{RESET}
+    """)
+
+def main_menu():
+    while True:
+        show_header()
+        
+        # Check active animation
+        curr_anim = "Неизвестно"
+        curr_file = os.path.join(ANIM_DIR, "current.lua")
+        if os.path.exists(curr_file):
+            with open(curr_file) as f:
+                content = f.read()
+                if "Void" in content:
+                    curr_anim = "Void (TikTok Rice)"
+                elif "Bouncy" in content:
+                    curr_anim = "Bouncy"
+                elif "Smooth" in content:
+                    curr_anim = "Smooth"
+                elif "Cyberpunk" in content:
+                    curr_anim = "Cyberpunk"
+                elif "Snappy" in content:
+                    curr_anim = "Snappy"
+
+        # Check dashboard status
+        dash_running = run_cmd("pgrep -f 'rice-(fetch|cava|pipes|clock|btop|art)'").returncode == 0
+        dash_status = f"{GREEN}Активен (7 виджетов){RESET}" if dash_running else f"{DIM}Не запущен{RESET}"
+
+        print(f"    {BOLD}Статус системы:{RESET}")
+        print(f"    • Виджет-дашборд (WS 9):  {dash_status}")
+        print(f"    • Активный пресет анимаций: {PURPLE}{curr_anim}{RESET}")
+        print(f"    • Быстрый хоткей:         {YELLOW}Alt + Tab{RESET} или {YELLOW}Super + D{RESET}")
+        print(f"    ────────────────────────────────────────────────────────────\n")
+
+        print(f"    {GREEN}[1]{RESET} Переключить/открыть Дашборд виджетов (Toggle)")
+        print(f"    {GREEN}[2]{RESET} Перезапустить виджеты дашборда")
+        print(f"    {GREEN}[3]{RESET} Закрыть виджеты дашборда")
+        print(f"    {CYAN}[4]{RESET} Сменить пресет анимации Hyprland")
+        print(f"    {PURPLE}[5]{RESET} Выбрать живые / анимированные обои")
+        print(f"    {PINK}[6]{RESET} Тест Cyber-UI звуков")
+        print(f"    {YELLOW}[7]{RESET} Запустить графическую студию анимаций (GUI)")
+        print(f"    {DIM}[0]{RESET} Выход\n")
+
+        choice = input(f"    {CYAN}Выберите действие [0-7]: {RESET}").strip()
+
+        if choice == "1":
+            play_sound("switch")
+            run_cmd("~/.local/bin/hypr-dashboard toggle")
+            break
+        elif choice == "2":
+            play_sound("popup")
+            print(f"\n    {YELLOW}Перезапуск виджетов...{RESET}")
+            run_cmd("~/.local/bin/hypr-dashboard restart")
+            play_sound("chime")
+            input(f"\n    {DIM}Нажмите Enter для продолжения...{RESET}")
+        elif choice == "3":
+            play_sound("pulse")
+            run_cmd("~/.local/bin/hypr-dashboard stop")
+            print(f"\n    {GREEN}Виджеты закрыты.{RESET}")
+            input(f"\n    {DIM}Нажмите Enter для продолжения...{RESET}")
+        elif choice == "4":
+            animation_menu()
+        elif choice == "5":
+            wallpaper_menu()
+        elif choice == "6":
+            sound_menu()
+        elif choice == "7":
+            play_sound("popup")
+            subprocess.Popen([os.path.expanduser("~/.local/bin/hypr-anim-gui")])
+            break
+        elif choice in ("0", "q", "exit"):
+            play_sound("blip")
+            print(f"\n    {GREEN}Удачи! Antigravity всегда на связи.{RESET}\n")
+            break
+
+def animation_menu():
+    presets = [
+        ("void", "Void (TikTok Rice)", "Вертикальный зум-слайд с овершотом как на видео"),
+        ("bouncy", "Bouncy", "Живой упругий отскок окон"),
+        ("smooth", "Smooth", "Шелковистая кинематографичная плавность"),
+        ("cyberpunk", "Cyberpunk", "Динамичные резкие слайды"),
+        ("snappy", "Snappy", "Мгновенный киберспортивный отклик"),
+        ("minimal", "Minimal", "Мягкий fade без лишних движений")
+    ]
+    while True:
+        show_header()
+        print(f"    {BOLD}Выбор пресета анимаций Hyprland:{RESET}\n")
+        for idx, (key, title, desc) in enumerate(presets, 1):
+            print(f"    {GREEN}[{idx}]{RESET} {BOLD}{title}{RESET}")
+            print(f"        {DIM}{desc}{RESET}")
+        print(f"\n    {DIM}[0] Назад{RESET}\n")
+
+        c = input(f"    {CYAN}Выберите пресет: {RESET}").strip()
+        if c == "0":
+            break
+        try:
+            num = int(c)
+            if 1 <= num <= len(presets):
+                key, title, _ = presets[num - 1]
+                src = os.path.join(ANIM_DIR, f"{key}.lua")
+                dst = os.path.join(ANIM_DIR, "current.lua")
+                if os.path.exists(src):
+                    with open(src) as f_in, open(dst, "w") as f_out:
+                        f_out.write(f_in.read())
+                    run_cmd("hyprctl reload")
+                    play_sound("chime")
+                    print(f"\n    {GREEN}✓ Активирован пресет {title}!{RESET}")
+                    input(f"\n    {DIM}Нажмите Enter для продолжения...{RESET}")
+                    break
+        except ValueError:
+            pass
+
+def wallpaper_menu():
+    files = sorted(glob.glob(os.path.join(LIVE_WP_DIR, "*")))
+    if not files:
+        print("\n    Живые обои не найдены.")
+        input()
+        return
+
+    while True:
+        show_header()
+        print(f"    {BOLD}Доступные живые / анимированные обои:{RESET}\n")
+        for idx, path in enumerate(files, 1):
+            fname = os.path.basename(path)
+            print(f"    {PURPLE}[{idx}]{RESET} {fname}")
+        print(f"\n    {DIM}[0] Назад{RESET}\n")
+
+        c = input(f"    {CYAN}Выберите номер для установки: {RESET}").strip()
+        if c == "0":
+            break
+        try:
+            num = int(c)
+            if 1 <= num <= len(files):
+                selected = files[num - 1]
+                run_cmd(f"omarchy-theme-bg-set '{selected}'")
+                play_sound("chime")
+                print(f"\n    {GREEN}✓ Установлены обои: {os.path.basename(selected)}{RESET}")
+                input(f"\n    {DIM}Нажмите Enter для продолжения...{RESET}")
+                break
+        except ValueError:
+            pass
+
+def sound_menu():
+    sounds = ["switch", "popup", "chime", "blip", "pulse"]
+    while True:
+        show_header()
+        print(f"    {BOLD}Прослушивание Cyber-UI звуков:{RESET}\n")
+        for idx, s in enumerate(sounds, 1):
+            print(f"    {PINK}[{idx}]{RESET} {s}.wav")
+        print(f"\n    {DIM}[0] Назад{RESET}\n")
+
+        c = input(f"    {CYAN}Выберите звук для воспроизведения: {RESET}").strip()
+        if c == "0":
+            break
+        try:
+            num = int(c)
+            if 1 <= num <= len(sounds):
+                play_sound(sounds[num - 1])
+        except ValueError:
+            pass
+
+if __name__ == "__main__":
+    try:
+        main_menu()
+    except KeyboardInterrupt:
+        print("\n")

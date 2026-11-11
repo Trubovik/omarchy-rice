@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Alt-Tab Window Switcher for Scrolling Tape
+~/.local/bin/hypr-window-switch next

@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# hypr-dashboard: Manage and toggle aesthetic Void/TikTok rice widgets
+# Author: Antigravity & trubovik
+
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/hypr-rice"
+mkdir -p "$STATE_DIR"
+PREV_WS_FILE="$STATE_DIR/prev_workspace"
+SOUND_FILE="$HOME/.local/share/sounds/cyber-ui/switch.wav"
+
+play_sound() {
+  if [[ -f "$SOUND_FILE" ]] && command -v pw-play >/dev/null 2>&1; then
+    pw-play --volume 0.25 "$SOUND_FILE" >/dev/null 2>&1 &
+  fi
+}
+
+is_running() {
+  pgrep -f "rice-(fetch|cava|pipes|clock|btop|art)" >/dev/null 2>&1
+}
+
+launch_widgets() {
+  # Запуск всех виджетов через hyprctl exec_cmd (надежно привязаны к сессии Hyprland)
+  hyprctl dispatch 'hl.dsp.exec_cmd("foot -a rice-cava-l cava -p /home/trubovik/.config/cava/config-rice-left")' >/dev/null 2>&1
+  hyprctl dispatch 'hl.dsp.exec_cmd("foot -a rice-fetch /home/trubovik/.local/bin/rice-fetch")' >/dev/null 2>&1
+  hyprctl dispatch 'hl.dsp.exec_cmd("foot -a rice-pipes /home/trubovik/.local/bin/pipes.sh -p 4 -f 30 -R")' >/dev/null 2>&1
+  hyprctl dispatch 'hl.dsp.exec_cmd("foot -a rice-clock /home/trubovik/.local/bin/rice-clock")' >/dev/null 2>&1
+  hyprctl dispatch 'hl.dsp.exec_cmd("foot -a rice-btop btop")' >/dev/null 2>&1
+  hyprctl dispatch 'hl.dsp.exec_cmd("foot -a rice-art /home/trubovik/.local/bin/rice-art")' >/dev/null 2>&1
+  hyprctl dispatch 'hl.dsp.exec_cmd("foot -a rice-cava-r cava -p /home/trubovik/.config/cava/config-rice-right")' >/dev/null 2>&1
+}
+
+close_widgets() {
+  pkill -f "rice-(fetch|cava|pipes|clock|btop|art)" 2>/dev/null || true
+}
+
+get_active_workspace() {
+  hyprctl activeworkspace -j 2>/dev/null | grep '"id":' | head -n 1 | awk -F': ' '{print $2}' | tr -d ',' | tr -d ' '
+}
+
+toggle_dashboard() {
+  CURRENT_WS=$(get_active_workspace)
+  CURRENT_WS="${CURRENT_WS:-1}"
+
+  if [[ "$CURRENT_WS" -eq 9 ]]; then
+    # Мы сейчас на дашборде -> переключаемся обратно на предыдущий рабочий стол
+    TARGET_WS="1"
+    if [[ -f "$PREV_WS_FILE" ]]; then
+      TARGET_WS=$(cat "$PREV_WS_FILE")
+    fi
+    [[ "$TARGET_WS" -eq 9 ]] && TARGET_WS="1"
+    play_sound
+    hyprctl dispatch "hl.dsp.focus({ workspace = \"$TARGET_WS\" })" >/dev/null 2>&1
+  else
+    # Сохраняем текущий рабочий стол и переходим на дашборд (9)
+    echo "$CURRENT_WS" > "$PREV_WS_FILE"
+    if ! is_running; then
+      launch_widgets
+      sleep 0.1
+    fi
+    play_sound
+    hyprctl dispatch 'hl.dsp.focus({ workspace = "9" })' >/dev/null 2>&1
+  fi
+}
+
+case "${1:-toggle}" in
+  toggle)
+    toggle_dashboard
+    ;;
+  start|launch)
+    if ! is_running; then
+      launch_widgets
+      echo "Dashboard widgets launched on workspace 9"
+    else
+      echo "Dashboard widgets are already running"
+    fi
+    ;;
+  stop|close|kill)
+    close_widgets
+    echo "Dashboard widgets closed"
+    ;;
+  restart)
+    close_widgets
+    sleep 0.2
+    launch_widgets
+    echo "Dashboard widgets restarted"
+    ;;
+  status)
+    if is_running; then
+      echo "Active (running)"
+    else
+      echo "Inactive"
+    fi
+    ;;
+  *)
+    echo "Usage: hypr-dashboard [toggle|start|stop|restart|status]"
+    exit 1
+    ;;
+esac
