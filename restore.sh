@@ -6,19 +6,37 @@ set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+SKIP_PACKAGES=false
+SET_NORWEGIAN=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-packages|--skip-packages|--quick|-n)
+      SKIP_PACKAGES=true
+      ;;
+    --norwegian|--no-layout)
+      SET_NORWEGIAN=true
+      ;;
+  esac
+done
+
 echo "=========================================="
 echo "  Восстановление кастомного Linux (Omarchy)"
 echo "=========================================="
 
 # 1. Установка пакетов
-if [[ -f "$DOTFILES_DIR/packages/pacman-packages.txt" ]]; then
-  echo "==> 1. Установка официальных пакетов Arch..."
-  sudo pacman -S --needed --noconfirm - < "$DOTFILES_DIR/packages/pacman-packages.txt" || true
-fi
+if [[ "$SKIP_PACKAGES" != "true" ]]; then
+  if [[ -f "$DOTFILES_DIR/packages/pacman-packages.txt" ]]; then
+    echo "==> 1. Установка официальных пакетов Arch..."
+    sudo pacman -S --needed --noconfirm - < "$DOTFILES_DIR/packages/pacman-packages.txt" || true
+  fi
 
-if [[ -f "$DOTFILES_DIR/packages/aur-packages.txt" ]] && command -v yay &>/dev/null; then
-  echo "==> 2. Установка AUR пакетов через yay..."
-  yay -S --needed --noconfirm - < "$DOTFILES_DIR/packages/aur-packages.txt" || true
+  if [[ -f "$DOTFILES_DIR/packages/aur-packages.txt" ]] && command -v yay &>/dev/null; then
+    echo "==> 2. Установка AUR пакетов через yay..."
+    yay -S --needed --noconfirm - < "$DOTFILES_DIR/packages/aur-packages.txt" || true
+  fi
+else
+  echo "==> [Пропуск] Установка пакетов пропущена (--no-packages)."
 fi
 
 # 2. Раскладывание конфигураций
@@ -26,6 +44,15 @@ echo "==> 3. Восстановление ~/.config/..."
 mkdir -p "$HOME/.config"
 if [[ -d "$DOTFILES_DIR/config" ]]; then
   cp -r "$DOTFILES_DIR/config/"* "$HOME/.config/"
+fi
+
+# Настройка клавиатуры под норвежскую раскладку
+if [[ "$SET_NORWEGIAN" == "true" ]]; then
+  echo "==> 3.0 Настройка норвежской раскладки клавиатуры (no, ru)..."
+  if [[ -f "$HOME/.config/hypr/input.lua" ]]; then
+    sed -i 's/kb_layout = "us"/kb_layout = "no,ru"/g' "$HOME/.config/hypr/input.lua"
+    sed -i 's/kb_options = "compose:caps,shift:both_capslock_cancel"/kb_options = "grp:alt_shift_toggle,compose:caps"/g' "$HOME/.config/hypr/input.lua"
+  fi
 fi
 
 # Восстановление шрифтов

@@ -19,7 +19,6 @@ cups
 cups-filters
 cups-pk-helper
 ddcutil
-discord
 docker
 docker-buildx
 docker-compose
@@ -132,7 +131,6 @@ slurp
 socat
 sof-firmware
 starship
-steam
 sudo
 sushi
 system-config-printer
