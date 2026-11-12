@@ -10,11 +10,11 @@ hl.env("LC_PAPER", "ru_RU.UTF-8")
 hl.env("LC_MEASUREMENT", "ru_RU.UTF-8")
 
 -- Keyboard layout and options.
--- Single layout: English (US)
+-- Primary layout US (guarantees identical keybindings), secondary Norwegian (for æ, ø, å)
 hl.config({
   input = {
-    kb_layout = "us",
-    kb_options = "compose:caps,shift:both_capslock_cancel",
+    kb_layout = "us,no",
+    kb_options = "grp:alt_shift_toggle,compose:caps,shift:both_capslock_cancel",
   },
 })
 

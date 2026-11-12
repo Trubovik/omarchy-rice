@@ -46,15 +46,6 @@ if [[ -d "$DOTFILES_DIR/config" ]]; then
   cp -r "$DOTFILES_DIR/config/"* "$HOME/.config/"
 fi
 
-# Настройка клавиатуры под норвежскую раскладку
-if [[ "$SET_NORWEGIAN" == "true" ]]; then
-  echo "==> 3.0 Настройка норвежской раскладки клавиатуры (no, ru)..."
-  if [[ -f "$HOME/.config/hypr/input.lua" ]]; then
-    sed -i 's/kb_layout = "us"/kb_layout = "no,ru"/g' "$HOME/.config/hypr/input.lua"
-    sed -i 's/kb_options = "compose:caps,shift:both_capslock_cancel"/kb_options = "grp:alt_shift_toggle,compose:caps"/g' "$HOME/.config/hypr/input.lua"
-  fi
-fi
-
 # Восстановление шрифтов
 if [[ -d "$DOTFILES_DIR/fonts" ]]; then
   echo "==> 3.0 Установка шрифтов интерфейса и иконок..."
