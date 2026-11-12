@@ -97,6 +97,15 @@ fi
 ln -sf "$HOME/.local/share/serpantinum/bin/serpantinum" "$HOME/.local/bin/serpantinum"
 ln -sf "$HOME/.local/share/serpantinum/bin/serpantinumd" "$HOME/.local/bin/serpantinumd"
 
+# Гарантируем наличие Google Antigravity binary (agy.bin)
+if [[ ! -f "$HOME/.local/bin/agy.bin" ]]; then
+  echo "==> Установка Google Antigravity (agy.bin)..."
+  curl -fsSL https://storage.googleapis.com/antigravity-public/antigravity-cli/1.5.6-6212266538958848/linux-x64/cli_linux_x64.tar.gz | tar -xz -C /tmp
+  mv /tmp/antigravity "$HOME/.local/bin/agy.bin"
+  chmod +x "$HOME/.local/bin/agy.bin"
+fi
+ln -sf "$HOME/.local/bin/agy" "$HOME/.local/bin/antigravity"
+
 # 4. Восстановление .desktop файлов
 echo "==> 5. Восстановление desktop-файлов..."
 mkdir -p "$HOME/.local/share/applications"

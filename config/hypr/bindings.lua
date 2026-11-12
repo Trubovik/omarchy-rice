@@ -29,6 +29,9 @@ hl.unbind("SUPER + B")
 -- Launch Google Chrome with clean Wayland/GPU environment
 o.bind("SUPER + B", "Google Chrome", { launch = "google-chrome-stable" })
 
+-- Quick Keybindings helper window (Super + Q and Super + K)
+o.bind("SUPER + Q", "Keybindings Window", "omarchy-menu-keybindings")
+
 -- Serpantinum Shell toggles (@ilyamiro.dev)
 o.bind("SUPER + bracketright", "Right Sidebar (Control Center, Todo, Pomodoro, Mixer)", "serpantinum msg toggle system")
 o.bind("SUPER + period", "Right Sidebar (Control Center, Todo, Pomodoro, Mixer)", "serpantinum msg toggle system")
